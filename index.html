@@ -1466,24 +1466,104 @@ const LANGUAGES = {
     rebuildPhotoScreen();
   }
 
+  // ===========================================================
+  //  SOPHISTICATED OCR PIPELINE
+  // ===========================================================
+
+  var lastRawImageData = null; // store original to allow reprocessing
+
   function handlePhotoFile(e) {
     var file = e.target.files[0];
     if (!file) return;
-    var preview = document.getElementById('photoPreview');
-    var status = document.getElementById('photoStatus');
     var reader = new FileReader();
     reader.onload = function(ev) {
+      lastRawImageData = ev.target.result;
+      var preview = document.getElementById('photoPreview');
       preview.innerHTML = '<img src="' + ev.target.result + '" alt="Preview">';
+      var status = document.getElementById('photoStatus');
       status.className = 'photo-status loading';
-      status.textContent = '🔄 Loading OCR engine... (~3MB first time)';
-      runOCR(ev.target.result);
+      status.textContent = '🔧 Preprocessing image...';
+      preprocessAndOCR(ev.target.result);
     };
     reader.readAsDataURL(file);
   }
 
+  // ----- Image preprocessing: convert to high-contrast B&W -----
+  function preprocessImage(dataUrl, callback) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      // Scale up if image is small (helps OCR), down if huge
+      var maxDim = 2000;
+      var minDim = 1200;
+      var w = img.width, h = img.height;
+      var scale = 1;
+      if (Math.max(w, h) > maxDim) scale = maxDim / Math.max(w, h);
+      else if (Math.max(w, h) < minDim) scale = minDim / Math.max(w, h);
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // Get pixel data and apply grayscale + adaptive contrast
+      var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var d = imgData.data;
+
+      // Pass 1: grayscale, compute histogram
+      var gray = new Uint8Array(canvas.width * canvas.height);
+      var hist = new Array(256); for (var i = 0; i < 256; i++) hist[i] = 0;
+      for (var p = 0, gi = 0; p < d.length; p += 4, gi++) {
+        // Standard luminance
+        var v = (d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114) | 0;
+        gray[gi] = v;
+        hist[v]++;
+      }
+
+      // Pass 2: Otsu's threshold for binarization
+      var total = canvas.width * canvas.height;
+      var sum = 0;
+      for (i = 0; i < 256; i++) sum += i * hist[i];
+      var sumB = 0, wB = 0, wF = 0, maxVar = 0, threshold = 128;
+      for (i = 0; i < 256; i++) {
+        wB += hist[i]; if (wB === 0) continue;
+        wF = total - wB; if (wF === 0) break;
+        sumB += i * hist[i];
+        var mB = sumB / wB;
+        var mF = (sum - sumB) / wF;
+        var between = wB * wF * (mB - mF) * (mB - mF);
+        if (between > maxVar) { maxVar = between; threshold = i; }
+      }
+
+      // Pass 3: Apply threshold with a small soft margin to keep some grays
+      var softMargin = 25;
+      for (p = 0, gi = 0; p < d.length; p += 4, gi++) {
+        var g = gray[gi];
+        var out;
+        if (g < threshold - softMargin) out = 0;
+        else if (g > threshold + softMargin) out = 255;
+        else {
+          // Linear interpolation in soft band
+          out = ((g - (threshold - softMargin)) / (2 * softMargin)) * 255 | 0;
+        }
+        d[p] = d[p + 1] = d[p + 2] = out;
+        d[p + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      callback(canvas.toDataURL('image/png'), canvas);
+    };
+    img.onerror = function() { callback(dataUrl, null); };
+    img.src = dataUrl;
+  }
+
+  function preprocessAndOCR(imageData) {
+    preprocessImage(imageData, function(processedUrl, canvas) {
+      runOCR(processedUrl);
+    });
+  }
+
   function runOCR(imageData) {
     var status = document.getElementById('photoStatus');
-    // Load Tesseract dynamically
+    status.textContent = '🔄 Loading OCR engine... (~3MB first time)';
     if (typeof Tesseract === 'undefined') {
       var script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
@@ -1501,40 +1581,64 @@ const LANGUAGES = {
   function doOCR(imageData) {
     var status = document.getElementById('photoStatus');
     status.textContent = '📖 Reading text from image...';
+    // Use Tesseract with English-only character whitelist + better PSM
     Tesseract.recognize(imageData, 'eng', {
       logger: function(m) {
         if (m.status === 'recognizing text') {
           status.textContent = '📖 Reading... ' + Math.round(m.progress * 100) + '%';
         }
-      }
+      },
+      // PSM 6 = Assume a single uniform block of text. Good for column lists.
+      tessedit_pageseg_mode: '6',
+      // Whitelist: lowercase + uppercase English + space + apostrophe + hyphen
+      tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ \'-'
     }).then(function(result) {
-      var text = result.data.text;
+      var text = result.data.text || '';
+      // Also use word-level confidence data when available
+      var wordsWithConfidence = [];
+      if (result.data.words) {
+        for (var i = 0; i < result.data.words.length; i++) {
+          var w = result.data.words[i];
+          if (w && w.text && w.confidence !== undefined) {
+            wordsWithConfidence.push({ text: w.text, confidence: w.confidence });
+          }
+        }
+      }
       console.log('OCR raw text:', text);
-      var words = extractEnglishWords(text);
-      console.log('Extracted candidates:', words);
-      if (words.length === 0) {
+      console.log('Word-level confidence:', wordsWithConfidence);
+
+      var candidates = extractEnglishWords(text, wordsWithConfidence);
+      console.log('Final candidates:', candidates);
+      if (candidates.length === 0) {
         status.className = 'photo-status error';
-        status.textContent = '❌ No words found. Try a clearer photo of printed text.';
+        status.textContent = '❌ No words found. Try a clearer photo or add words manually.';
+        showOcrReview([], [], true); // empty review screen so user can add manually
         return;
       }
-      status.className = 'photo-status success';
-      status.textContent = '✅ Found ' + words.length + ' candidate words. Matching...';
-      translateExtractedWords(words);
+      translateExtractedWords(candidates);
     }).catch(function(err) {
       status.className = 'photo-status error';
-      status.textContent = '❌ OCR failed: ' + err.message;
+      status.textContent = '❌ OCR failed: ' + (err.message || err);
     });
   }
 
-  function extractEnglishWords(text) {
-    // Build a master list of multi-word phrases from the dictionary
-    var phrases = {};
+  // ----- Smart word extraction: strict, no fuzzy guessing -----
+  function extractEnglishWords(text, wordsWithConfidence) {
+    // Build phrase map from dictionary
+    var phraseSet = {};
+    var phraseByFirstWord = {}; // index for multi-word lookup
     for (var L = 1; L <= 5; L++) {
       for (var en in DICTIONARY[L]) {
-        // Strip parenthetical notes like "(noun)"
         var clean = en.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
-        phrases[clean] = en;
+        phraseSet[clean] = true;
+        var firstWord = clean.split(/\s+/)[0];
+        if (!phraseByFirstWord[firstWord]) phraseByFirstWord[firstWord] = [];
+        phraseByFirstWord[firstWord].push(clean);
       }
+    }
+    // Sort each first-word's list by length descending (longest match first)
+    for (var fw in phraseByFirstWord) {
+      phraseByFirstWord[fw].sort(function(a, b) { return b.length - a.length; });
     }
 
     var candidates = [];
@@ -1542,118 +1646,104 @@ const LANGUAGES = {
 
     function addCandidate(w) {
       w = w.toLowerCase().trim();
-      if (w.length < 2) return;
-      if (seen[w]) return;
+      if (w.length < 2 || seen[w]) return;
       seen[w] = true;
       candidates.push(w);
     }
 
-    // Split into lines, then process each line
+    // Confidence filtering: build a set of low-confidence words to be skeptical of
+    var lowConfWords = {};
+    if (wordsWithConfidence && wordsWithConfidence.length > 0) {
+      for (var i = 0; i < wordsWithConfidence.length; i++) {
+        var wc = wordsWithConfidence[i];
+        if (wc.confidence < 60) {
+          var cleanWc = wc.text.toLowerCase().replace(/[^a-z'-]/g, '');
+          if (cleanWc) lowConfWords[cleanWc] = wc.confidence;
+        }
+      }
+    }
+
+    // Process line by line
     var lines = text.split(/[\n\r]+/);
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      // Replace common OCR artifacts:
-      //   "v" or "V" at start of word often = checkmark misread → remove
-      //   numbers, dots, dashes between letters
-      line = line.replace(/[√✓]/g, ' '); // explicit checkmarks
-      line = line.replace(/[^\w\s'-]/g, ' '); // keep letters, digits, spaces, apostrophe, hyphen
-      line = line.replace(/\s+/g, ' ').trim();
+    for (var li = 0; li < lines.length; li++) {
+      var line = lines[li];
+      // Strip checkmarks/symbols
+      line = line.replace(/[√✓×]/g, ' ');
+      // Keep only letters/spaces/apostrophes/hyphens
+      line = line.replace(/[^a-zA-Z\s'-]/g, ' ');
+      line = line.replace(/\s+/g, ' ').trim().toLowerCase();
       if (!line) continue;
 
-      // First try to match multi-word phrases (2-3 words) against dictionary
       var tokens = line.split(/\s+/);
       var idx = 0;
       while (idx < tokens.length) {
         var matched = false;
-        // Try 3-word, 2-word, 1-word combos
-        for (var span = Math.min(3, tokens.length - idx); span >= 1; span--) {
-          var combo = tokens.slice(idx, idx + span).join(' ').toLowerCase();
-          combo = combo.replace(/[0-9]/g, '').replace(/^[^a-z]+|[^a-z]+$/g, '').trim();
-          if (combo.length < 2) continue;
-          // Skip if first token is just "v" (likely OCR artifact for checkmark)
-          if (span === 1 && (combo === 'v' || combo === 'vv')) continue;
-          if (phrases[combo]) {
-            addCandidate(combo);
-            idx += span;
-            matched = true;
-            break;
+        var firstToken = tokens[idx].replace(/^[^a-z]+|[^a-z]+$/g, '');
+
+        // Handle stray "v" or "x" tokens (likely checkmark/X markers) — skip them
+        if (firstToken === 'v' || firstToken === 'vv' || firstToken === 'x' || firstToken === 'xx') {
+          idx++; continue;
+        }
+        // If token starts with "v" + a known word, strip the v
+        if (firstToken.length > 3 && firstToken.charAt(0) === 'v' && phraseSet[firstToken.substring(1)]) {
+          firstToken = firstToken.substring(1);
+        }
+
+        // Try multi-word phrases starting with this token
+        if (phraseByFirstWord[firstToken]) {
+          var candidatePhrases = phraseByFirstWord[firstToken];
+          for (var pi = 0; pi < candidatePhrases.length; pi++) {
+            var phrase = candidatePhrases[pi];
+            var phraseTokens = phrase.split(/\s+/);
+            if (idx + phraseTokens.length > tokens.length) continue;
+            var match = true;
+            for (var pti = 0; pti < phraseTokens.length; pti++) {
+              var tokClean = tokens[idx + pti].replace(/^[^a-z]+|[^a-z]+$/g, '');
+              if (tokClean !== phraseTokens[pti]) { match = false; break; }
+            }
+            if (match) {
+              addCandidate(phrase);
+              idx += phraseTokens.length;
+              matched = true;
+              break;
+            }
           }
         }
+
         if (!matched) {
-          // Add the token as-is for fuzzy matching later
-          var t = tokens[idx].toLowerCase().replace(/[0-9]/g, '').replace(/^[^a-z]+|[^a-z]+$/g, '').trim();
-          // Drop "v" prefix (mis-OCR'd checkmark)
-          if (t.length > 1 && t[0] === 'v' && phrases[t.substring(1)]) {
-            t = t.substring(1);
+          // Try single token as exact dictionary match
+          if (phraseSet[firstToken] && firstToken.length >= 3) {
+            // Allow exact 3+ letter matches; reject 1-2 letter fragments
+            addCandidate(firstToken);
           }
-          if (t.length >= 2) addCandidate(t);
           idx++;
         }
       }
     }
+
     return candidates;
   }
 
-  // ===== Fuzzy matching for OCR errors =====
-  function levenshtein(a, b) {
-    if (a === b) return 0;
-    if (!a.length) return b.length;
-    if (!b.length) return a.length;
-    var matrix = [];
-    for (var i = 0; i <= b.length; i++) matrix[i] = [i];
-    for (var j = 0; j <= a.length; j++) matrix[0][j] = j;
-    for (i = 1; i <= b.length; i++) {
-      for (j = 1; j <= a.length; j++) {
-        if (b.charAt(i - 1) === a.charAt(j - 1)) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = Math.min(
-            matrix[i - 1][j - 1] + 1,
-            matrix[i][j - 1] + 1,
-            matrix[i - 1][j] + 1
-          );
-        }
-      }
-    }
-    return matrix[b.length][a.length];
-  }
-
+  // ----- Strict dictionary lookup: exact match only -----
   function findInDictionary(en) {
-    // Exact match first
     for (var L = 1; L <= 5; L++) {
       if (DICTIONARY[L][en] && DICTIONARY[L][en][currentLang]) {
-        return { en: en, tr: DICTIONARY[L][en][currentLang], exact: true };
+        return { en: en, tr: DICTIONARY[L][en][currentLang] };
       }
     }
-    // Try with parenthetical variants stripped
+    // Try parenthetical variants
     for (L = 1; L <= 5; L++) {
       for (var key in DICTIONARY[L]) {
         var clean = key.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
         if (clean === en && DICTIONARY[L][key][currentLang]) {
-          return { en: clean, tr: DICTIONARY[L][key][currentLang], exact: true };
+          return { en: clean, tr: DICTIONARY[L][key][currentLang] };
         }
       }
     }
-    // Fuzzy match — allow 1 character difference for short words, 2 for longer
-    var bestMatch = null;
-    var bestDist = 999;
-    var threshold = en.length <= 4 ? 1 : (en.length <= 7 ? 1 : 2);
-    for (L = 1; L <= 5; L++) {
-      for (var key2 in DICTIONARY[L]) {
-        var clean2 = key2.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
-        if (Math.abs(clean2.length - en.length) > threshold) continue;
-        var d = levenshtein(en, clean2);
-        if (d <= threshold && d < bestDist) {
-          bestDist = d;
-          bestMatch = { en: clean2, tr: DICTIONARY[L][key2][currentLang], exact: false, original: en };
-        }
-      }
-    }
-    return bestMatch;
+    return null;
   }
 
   function translateExtractedWords(englishWords) {
-    var status = document.getElementById('photoStatus');
     var found = [];
     var notFound = [];
     var foundKeys = {};
@@ -1662,48 +1752,56 @@ const LANGUAGES = {
       var match = findInDictionary(en);
       if (match && !foundKeys[match.en]) {
         foundKeys[match.en] = true;
-        found.push({ en: match.en, tr: match.tr, fuzzy: !match.exact, originalOcr: match.original });
+        found.push({ en: match.en, tr: match.tr });
       } else if (!match) {
         notFound.push(en);
       }
     }
-
-    if (found.length === 0) {
-      status.className = 'photo-status error';
-      status.innerHTML = '❌ No matching words found in dictionary.<br>' +
-        '<small>OCR detected: ' + englishWords.slice(0, 10).join(', ') +
-        (englishWords.length > 10 ? '…' : '') + '</small><br>' +
-        '<small>Try a clearer image, or use <b>My Words</b> to add them manually.</small>';
-      return;
-    }
-
-    // Show review screen
-    showOcrReview(found, notFound);
+    showOcrReview(found, notFound, false);
   }
 
-  function showOcrReview(found, notFound) {
-    // Replace the photo screen content with a review UI
+  // ===========================================================
+  //  REVIEW SCREEN — fully editable
+  // ===========================================================
+  function showOcrReview(found, notFound, isEmpty) {
     var photoScreen = document.getElementById('photoScreen');
-    var reviewHtml = '<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;">' +
-      '<div style="font-family:\'Bagel Fat One\',sans-serif;font-size:18px;text-align:center;">Review Words</div>' +
-      '<div style="font-size:12px;color:#6b7280;text-align:center;font-weight:500;">' +
-        'Found <b>' + found.length + '</b> words. Tap × to remove any wrong ones. Then play!' +
-      '</div>' +
-      '<div id="reviewList" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border:2px dashed #d1d5db;border-radius:10px;padding:8px;background:#fafafa;"></div>' +
-      (notFound.length > 0 ?
-        '<div style="font-size:11px;color:#9ca3af;background:#fef3c7;border-radius:8px;padding:6px;border:1px dashed #d97706;">' +
-        '⚠️ Skipped (no translation): <i>' + notFound.slice(0, 8).join(', ') + (notFound.length > 8 ? '…' : '') + '</i>' +
-        '</div>' : ''
-      ) +
-      '<div style="display:flex;gap:6px;flex-shrink:0;">' +
-        '<button id="reviewCancel" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:white;">← Back</button>' +
-        '<button id="reviewPlay" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:#22c55e;color:white;">▶ Play (' + found.length + ')</button>' +
-      '</div>' +
-    '</div>';
-    photoScreen.innerHTML = reviewHtml;
+    var headerText = isEmpty
+      ? 'No words found. Add some manually below:'
+      : 'Found <b>' + found.length + '</b> words. Edit, add, or remove. Then play!';
+
+    photoScreen.innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;">' +
+        '<div style="font-family:\'Bagel Fat One\',sans-serif;font-size:18px;text-align:center;">Review &amp; Edit</div>' +
+        '<div style="font-size:12px;color:#6b7280;text-align:center;font-weight:500;">' + headerText + '</div>' +
+
+        // Add row
+        '<div class="custom-add">' +
+          '<input type="text" id="reviewAddEn" placeholder="English word" autocomplete="off" autocorrect="off" autocapitalize="none">' +
+          '<input type="text" id="reviewAddTr" placeholder="Translation" autocomplete="off">' +
+          '<button id="reviewAddBtn">+ Add</button>' +
+        '</div>' +
+
+        '<div id="reviewList" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border:2px dashed #d1d5db;border-radius:10px;padding:8px;background:#fafafa;"></div>' +
+
+        (notFound.length > 0 ?
+          '<div style="font-size:11px;color:#9ca3af;background:#fef3c7;border-radius:8px;padding:6px;border:1px dashed #d97706;">' +
+            '⚠️ Detected but no translation: <i>' + notFound.slice(0, 10).join(', ') + (notFound.length > 10 ? '…' : '') + '</i>' +
+          '</div>' : ''
+        ) +
+
+        '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+          '<button id="reviewRetake" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:white;">📷 New Photo</button>' +
+          '<button id="reviewPlay" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:#22c55e;color:white;">▶ Play (' + found.length + ')</button>' +
+        '</div>' +
+      '</div>';
 
     var reviewWords = found.slice();
     var isRTL = LANGUAGES[currentLang].dir === 'rtl';
+
+    // Set up Translation input direction
+    var trInput = document.getElementById('reviewAddTr');
+    trInput.style.direction = LANGUAGES[currentLang].dir;
+    if (isRTL) trInput.style.fontFamily = "'Heebo', sans-serif";
 
     function renderReview() {
       var listEl = document.getElementById('reviewList');
@@ -1711,7 +1809,7 @@ const LANGUAGES = {
       playBtn.textContent = '▶ Play (' + reviewWords.length + ')';
       playBtn.disabled = reviewWords.length < 5;
       if (reviewWords.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:13px;padding:20px;font-style:italic;">No words left.</div>';
+        listEl.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:13px;padding:20px;font-style:italic;">No words yet. Add at least 5 to play.</div>';
         return;
       }
       listEl.innerHTML = '';
@@ -1719,12 +1817,11 @@ const LANGUAGES = {
         (function(idx, word) {
           var row = document.createElement('div');
           row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:white;border-radius:8px;border:1px solid #e5e7eb;';
-          var fuzzyTag = word.fuzzy ? '<span style="font-size:9px;color:#d97706;background:#fef3c7;padding:1px 4px;border-radius:4px;margin-left:4px;">corrected</span>' : '';
           var trStyle = isRTL ? 'flex:1;text-align:right;font-family:Heebo,sans-serif;font-weight:600;font-size:14px;direction:rtl;' : 'flex:1;text-align:left;font-family:Fredoka,sans-serif;font-weight:600;font-size:14px;';
           row.innerHTML =
-            '<span style="flex:1;font-weight:600;font-size:13px;">' + word.en + fuzzyTag + '</span>' +
+            '<span style="flex:1;font-weight:600;font-size:13px;">' + word.en + '</span>' +
             '<span style="' + trStyle + '">' + word.tr + '</span>' +
-            '<button data-i="' + idx + '" style="background:#fecaca;border:1px solid #ef4444;color:#ef4444;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>';
+            '<button style="background:#fecaca;border:1px solid #ef4444;color:#ef4444;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>';
           row.querySelector('button').addEventListener('click', function() {
             reviewWords.splice(idx, 1);
             renderReview();
@@ -1736,9 +1833,62 @@ const LANGUAGES = {
 
     renderReview();
 
-    document.getElementById('reviewCancel').addEventListener('click', function() {
-      rebuildPhotoScreen();
+    // Add button — looks up translation from dictionary, or accepts user-provided translation
+    document.getElementById('reviewAddBtn').addEventListener('click', function() {
+      var enInput = document.getElementById('reviewAddEn');
+      var trInput = document.getElementById('reviewAddTr');
+      var enVal = enInput.value.trim().toLowerCase();
+      var trVal = trInput.value.trim();
+      if (!enVal) { enInput.focus(); return; }
+
+      // If translation not provided, try dictionary
+      if (!trVal) {
+        var match = findInDictionary(enVal);
+        if (match) trVal = match.tr;
+        else {
+          alert('No translation found for "' + enVal + '". Please type the translation manually.');
+          trInput.focus();
+          return;
+        }
+      }
+
+      // Check for duplicate
+      var dup = false;
+      for (var i = 0; i < reviewWords.length; i++) {
+        if (reviewWords[i].en === enVal) { dup = true; break; }
+      }
+      if (dup) {
+        alert('"' + enVal + '" is already in the list.');
+        return;
+      }
+
+      reviewWords.push({ en: enVal, tr: trVal });
+      enInput.value = '';
+      trInput.value = '';
+      enInput.focus();
+      renderReview();
     });
+
+    // Enter key on EN field auto-fills translation if found
+    document.getElementById('reviewAddEn').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        var enVal = e.target.value.trim().toLowerCase();
+        var trInput = document.getElementById('reviewAddTr');
+        if (!trInput.value.trim() && enVal) {
+          var match = findInDictionary(enVal);
+          if (match) trInput.value = match.tr;
+        }
+        if (trInput.value.trim()) document.getElementById('reviewAddBtn').click();
+        else trInput.focus();
+      }
+    });
+    document.getElementById('reviewAddTr').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        document.getElementById('reviewAddBtn').click();
+      }
+    });
+
+    document.getElementById('reviewRetake').addEventListener('click', rebuildPhotoScreen);
     document.getElementById('reviewPlay').addEventListener('click', function() {
       if (reviewWords.length < 5) { alert('Need at least 5 words to play'); return; }
       sessionWords = reviewWords.map(function(w) { return { en: w.en, tr: w.tr }; });
@@ -1758,7 +1908,8 @@ const LANGUAGES = {
     var photoScreen = document.getElementById('photoScreen');
     photoScreen.innerHTML =
       '<div class="photo-info">' +
-        '📷 Take a photo or upload one of a vocabulary list. <b>Works best with clear printed text.</b> Handwriting may not work well. You\'ll be able to review and edit the words after.' +
+        '📷 Take a photo or upload one of a vocabulary list. <b>Works best with clear printed text.</b><br>' +
+        '<small>You can review, edit, and add words manually after.</small>' +
       '</div>' +
       '<div class="photo-controls">' +
         '<label for="photoCamera">📸 Take Photo' +
@@ -1770,10 +1921,27 @@ const LANGUAGES = {
       '</div>' +
       '<div class="photo-preview" id="photoPreview"></div>' +
       '<div class="photo-status" id="photoStatus">Ready when you are 👆</div>';
-    // Re-bind handlers
     document.getElementById('photoCamera').addEventListener('change', handlePhotoFile);
     document.getElementById('photoUpload').addEventListener('change', handlePhotoFile);
   }
+
+  // Levenshtein kept for potential future use (currently unused — we use exact match only)
+  function levenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    var matrix = [];
+    for (var i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (var j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (i = 1; i <= b.length; i++) {
+      for (j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+        else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
 
   // ===== Game logic =====
   function updateProgress() {
