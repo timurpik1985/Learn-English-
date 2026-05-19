@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>Word Quest 🎯</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Word Quest">
+<meta name="theme-color" content="#fbbf24">
+
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23fbbf24'/%3E%3Ctext x='90' y='115' font-size='100' text-anchor='middle' font-family='Arial'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='80' font-size='80'%3E%F0%9F%8E%AF%3C/text%3E%3C/svg%3E">
+
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Bagel+Fat+One&family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --ink: #1f2937;
+    --accent: #f59e0b;
+    --accent-dark: #d97706;
+    --pink: #ec4899;
+    --green: #22c55e;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+  }
+  html, body { height: 100%; overflow: hidden; position: fixed; width: 100%; }
+  body {
+    font-family: 'Fredoka', sans-serif;
+    background:
+      radial-gradient(circle at 20% 15%, #fde68a 0%, transparent 45%),
+      radial-gradient(circle at 80% 80%, #fbcfe8 0%, transparent 45%),
+      radial-gradient(circle at 50% 50%, #bae6fd 0%, transparent 60%),
+      linear-gradient(135deg, #fef3c7 0%, #fce7f3 100%);
+    color: var(--ink);
+    height: 100vh;
+    height: calc(var(--vh, 1vh) * 100);
+    display: flex;
+    flex-direction: column;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)) 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  body::before, body::after {
+    content: ''; position: fixed; border-radius: 50%;
+    filter: blur(60px); opacity: 0.45; z-index: 0; pointer-events: none;
+  }
+  body::before { width: 250px; height: 250px; background: #fbbf24; top: -80px; left: -80px; animation: float1 12s ease-in-out infinite; }
+  body::after { width: 280px; height: 280px; background: #f472b6; bottom: -100px; right: -100px; animation: float2 14s ease-in-out infinite; }
+  @keyframes float1 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(40px,60px) scale(1.1); } }
+  @keyframes float2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-50px,-40px) scale(1.15); } }
+
+  .app {
+    width: 100%; max-width: 560px; margin: 0 auto;
+    flex: 1; display: flex; flex-direction: column;
+    position: relative; z-index: 1; min-height: 0;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 6px; margin-bottom: 8px; padding: 0 2px; flex-shrink: 0;
+  }
+  .logo { font-family: 'Bagel Fat One', sans-serif; font-size: 20px; letter-spacing: -0.5px; line-height: 1; cursor: pointer; }
+  .logo .star { color: var(--accent); display: inline-block; animation: spin 8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .stats { display: flex; gap: 4px; align-items: center; }
+  .stat {
+    background: white; border: 2px solid var(--ink); border-radius: 10px;
+    padding: 3px 7px; font-weight: 700; font-size: 12px;
+    box-shadow: 2px 2px 0 var(--ink); display: flex; align-items: center; gap: 3px;
+    line-height: 1;
+  }
+  .stat.mastered { background: #bbf7d0; }
+  .stat.streak { background: #fda4af; }
+  .stat.score { background: #fef08a; }
+
+  .icon-btn {
+    width: 30px; height: 30px; border-radius: 50%; background: white;
+    color: var(--ink); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; padding: 0; line-height: 1;
+  }
+  .icon-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .icon-btn.home { background: var(--accent); }
+
+  /* CARD */
+  .card {
+    background: white; border: 3px solid var(--ink); border-radius: 18px;
+    padding: 14px; box-shadow: 4px 4px 0 var(--ink);
+    flex: 1; display: flex; flex-direction: column; min-height: 0; gap: 8px;
+    overflow: hidden;
+  }
+  .card.scroll { overflow-y: auto; }
+
+  /* HOME SCREEN */
+  .home-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
+  .home-screen.hide { display: none; }
+  .home-title {
+    text-align: center;
+    font-family: 'Bagel Fat One', sans-serif;
+    font-size: clamp(22px, 6vw, 30px);
+    line-height: 1.1;
+    padding: 4px 0;
+  }
+  .home-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #6b7280;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .mode-grid { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+  .mode-btn {
+    background: white; border: 3px solid var(--ink); border-radius: 16px;
+    padding: 14px 16px; cursor: pointer; box-shadow: 4px 4px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s;
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'Fredoka', sans-serif;
+    flex: 1; min-height: 0;
+    text-align: left;
+  }
+  .mode-btn:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
+  .mode-btn .emoji { font-size: 36px; line-height: 1; flex-shrink: 0; }
+  .mode-btn .title { font-weight: 700; font-size: 18px; color: var(--ink); margin-bottom: 2px; }
+  .mode-btn .desc { font-size: 12px; color: #6b7280; font-weight: 500; }
+  .mode-btn.level-play { background: linear-gradient(135deg, #fde68a 0%, #fed7aa 100%); }
+  .mode-btn.photo { background: linear-gradient(135deg, #bae6fd 0%, #c7d2fe 100%); }
+  .mode-btn.custom { background: linear-gradient(135deg, #fbcfe8 0%, #ddd6fe 100%); }
+
+  /* LANGUAGE PICKER */
+  .picker-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
+  .picker-screen.hide { display: none; }
+  .picker-title { font-family: 'Bagel Fat One', sans-serif; font-size: 22px; text-align: center; line-height: 1.1; }
+  .picker-subtitle { text-align: center; font-size: 13px; color: #6b7280; font-weight: 500; }
+
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    flex: 1; min-height: 0;
+    overflow-y: auto;
+    padding: 2px;
+  }
+  .lang-btn {
+    background: white; border: 2.5px solid var(--ink); border-radius: 12px;
+    padding: 10px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    display: flex; align-items: center; gap: 8px; font-family: 'Fredoka', sans-serif;
+    font-weight: 700; font-size: 14px; color: var(--ink);
+    min-height: 50px;
+  }
+  .lang-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .lang-btn .flag { font-size: 24px; line-height: 1; }
+
+  .level-grid { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; padding: 2px; overflow-y: auto; }
+  .level-btn {
+    background: white; border: 2.5px solid var(--ink); border-radius: 12px;
+    padding: 12px 14px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    display: flex; align-items: center; gap: 12px; font-family: 'Fredoka', sans-serif;
+    flex: 1; min-height: 0;
+  }
+  .level-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .level-btn .level-num {
+    font-family: 'Bagel Fat One', sans-serif;
+    font-size: 24px; width: 40px; height: 40px;
+    background: var(--accent); border: 2px solid var(--ink); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white;
+  }
+  .level-btn[data-level="1"] .level-num { background: #4ade80; }
+  .level-btn[data-level="2"] .level-num { background: #60a5fa; }
+  .level-btn[data-level="3"] .level-num { background: #fbbf24; }
+  .level-btn[data-level="4"] .level-num { background: #fb923c; }
+  .level-btn[data-level="5"] .level-num { background: #ef4444; }
+  .level-btn .level-title { font-weight: 700; font-size: 16px; color: var(--ink); }
+  .level-btn .level-desc { font-size: 11px; color: #6b7280; font-weight: 500; }
+
+  /* GAME SCREEN — same as before */
+  .game-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; }
+  .game-screen.hide { display: none; }
+
+  .progress-wrap {
+    height: 10px; background: #f3f4f6; border: 2px solid var(--ink);
+    border-radius: 999px; overflow: hidden; position: relative; flex-shrink: 0;
+  }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, var(--green) 0%, #4ade80 100%);
+    border-radius: 999px; transition: width 0.5s cubic-bezier(.34,1.56,.64,1); width: 0%;
+  }
+  .progress-label {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; color: var(--ink); letter-spacing: 0.5px;
+  }
+
+  .question {
+    text-align: center; padding: 10px 8px;
+    background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+    border: 2px dashed var(--ink); border-radius: 14px; flex-shrink: 0;
+  }
+  .word-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .word {
+    font-family: 'Bagel Fat One', sans-serif;
+    font-size: clamp(26px, 6.5vw, 38px);
+    line-height: 1; letter-spacing: -1px;
+  }
+  .speak-btn {
+    width: 42px; height: 42px; border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s; flex-shrink: 0;
+  }
+  .speak-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .speak-btn.speaking { background: var(--pink); animation: pulse 0.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+  .speak-btn svg { width: 20px; height: 20px; }
+
+  .options { display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; }
+  .option {
+    background: white; border: 2.5px solid var(--ink); border-radius: 12px;
+    padding: 0 14px; font-family: 'Heebo', sans-serif;
+    font-size: clamp(17px, 4.5vw, 22px);
+    font-weight: 700; color: var(--ink); cursor: pointer;
+    box-shadow: 2px 2px 0 var(--ink);
+    transition: transform 0.12s, box-shadow 0.12s, background 0.2s;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    flex: 1; min-height: 0;
+  }
+  .option.rtl { direction: rtl; text-align: right; }
+  .option.ltr { direction: ltr; text-align: left; }
+  .option:active:not(:disabled) { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .option:disabled { cursor: not-allowed; }
+  .option-num {
+    font-family: 'Bagel Fat One', sans-serif; font-size: 14px;
+    width: 22px; height: 22px;
+    background: #f3f4f6; border: 2px solid var(--ink); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; direction: ltr; flex-shrink: 0;
+  }
+  .option.correct { background: #86efac; animation: correctPop 0.5s ease-out; }
+  .option.wrong { background: #fca5a5; animation: shake 0.4s ease-out; }
+  @keyframes correctPop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+
+  .bottom-bar { flex-shrink: 0; display: flex; flex-direction: column; gap: 6px; }
+  .feedback {
+    padding: 8px 10px; border-radius: 10px; text-align: center;
+    font-weight: 600; font-size: 13px; display: none; border: 2px solid var(--ink); line-height: 1.2;
+  }
+  .feedback.show { display: block; animation: slideUp 0.3s ease-out; }
+  .feedback.good { background: #bbf7d0; }
+  .feedback.bad { background: #fecaca; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .feedback .emoji { font-size: 16px; margin-right: 4px; }
+
+  .next-btn {
+    padding: 12px; background: var(--ink); color: white;
+    border: 2px solid var(--ink); border-radius: 12px;
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; box-shadow: 3px 3px 0 var(--accent);
+    transition: transform 0.12s, box-shadow 0.12s; display: none; letter-spacing: 0.5px;
+  }
+  .next-btn.show { display: block; animation: slideUp 0.3s ease-out; }
+  .next-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--accent); }
+
+  /* CUSTOM LIST EDITOR */
+  .custom-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; }
+  .custom-screen.hide { display: none; }
+  .custom-add {
+    display: flex; gap: 6px;
+    flex-shrink: 0;
+  }
+  .custom-add input {
+    flex: 1; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px;
+    font-family: 'Fredoka', sans-serif; font-size: 14px;
+    background: white; min-width: 0;
+  }
+  .custom-add input.he-input { font-family: 'Heebo', sans-serif; direction: rtl; }
+  .custom-add button {
+    background: var(--accent); border: 2px solid var(--ink); border-radius: 10px;
+    padding: 10px 14px; cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 14px;
+    flex-shrink: 0;
+  }
+  .custom-add button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .custom-list {
+    flex: 1; min-height: 0; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 4px;
+    border: 2px dashed #d1d5db; border-radius: 10px; padding: 8px;
+    background: #fafafa;
+  }
+  .custom-empty {
+    text-align: center; color: #9ca3af; font-size: 13px; padding: 20px;
+    font-style: italic;
+  }
+  .custom-row {
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+    background: white; border-radius: 8px; border: 1px solid #e5e7eb;
+  }
+  .custom-row .en { flex: 1; font-weight: 600; font-size: 13px; }
+  .custom-row .tr { flex: 1; text-align: right; font-family: 'Heebo', sans-serif; font-weight: 600; font-size: 14px; }
+  .custom-row .tr.ltr { text-align: left; font-family: 'Fredoka', sans-serif; }
+  .custom-row .del {
+    background: #fecaca; border: 1px solid var(--red); color: var(--red);
+    width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+    font-weight: 700; font-size: 14px; line-height: 1; padding: 0;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .custom-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .custom-actions button {
+    flex: 1; padding: 10px; border: 2px solid var(--ink); border-radius: 10px;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 14px;
+  }
+  .custom-actions .play { background: var(--green); color: white; }
+  .custom-actions .clear { background: white; }
+  .custom-actions button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+  .custom-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* PHOTO OCR */
+  .photo-screen { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 8px; }
+  .photo-screen.hide { display: none; }
+  .photo-info {
+    background: #fef3c7; border: 2px dashed var(--ink); border-radius: 10px;
+    padding: 10px; font-size: 12px; font-weight: 500; color: var(--ink); line-height: 1.4;
+    flex-shrink: 0;
+  }
+  .photo-controls { display: flex; gap: 6px; flex-shrink: 0; }
+  .photo-controls label, .photo-controls button {
+    flex: 1; padding: 12px; border: 2px solid var(--ink); border-radius: 10px;
+    cursor: pointer; box-shadow: 2px 2px 0 var(--ink);
+    font-family: 'Fredoka', sans-serif; font-weight: 700; font-size: 14px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-align: center;
+  }
+  .photo-controls input[type="file"] { display: none; }
+  .photo-status {
+    text-align: center; padding: 12px; background: white;
+    border-radius: 10px; border: 2px solid var(--ink);
+    font-size: 13px; font-weight: 600; min-height: 50px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .photo-status.loading { background: #dbeafe; }
+  .photo-status.error { background: #fecaca; color: var(--red); }
+  .photo-status.success { background: #bbf7d0; }
+  .photo-preview { flex-shrink: 0; }
+  .photo-preview img { max-width: 100%; max-height: 120px; border-radius: 8px; border: 2px solid var(--ink); display: block; margin: 0 auto; }
+
+  /* CONFETTI */
+  .confetti { position: fixed; width: 10px; height: 14px; pointer-events: none; z-index: 100; top: -20px; }
+
+  /* ALL DONE */
+  .all-done {
+    text-align: center; padding: 20px 12px; display: none;
+    flex: 1; flex-direction: column; justify-content: center; align-items: center;
+  }
+  .all-done.show { display: flex; }
+  .all-done .big-emoji { font-size: 60px; margin-bottom: 8px; line-height: 1; }
+  .all-done .title { font-family: 'Bagel Fat One', sans-serif; font-size: 28px; margin-bottom: 6px; line-height: 1; }
+  .all-done .sub { font-size: 14px; color: #6b7280; margin-bottom: 16px; font-weight: 500; }
+  .all-done button {
+    width: 100%; max-width: 280px; padding: 14px; background: var(--accent); color: var(--ink);
+    border: 3px solid var(--ink); border-radius: 14px;
+    font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 700;
+    cursor: pointer; box-shadow: 4px 4px 0 var(--ink);
+  }
+
+  /* Small screens */
+  @media (max-height: 700px) {
+    .word { font-size: 26px; }
+    .question { padding: 8px; }
+    .speak-btn { width: 38px; height: 38px; }
+    .option { font-size: 17px; padding: 0 12px; }
+    .mode-btn .emoji { font-size: 30px; }
+    .mode-btn .title { font-size: 16px; }
+  }
+  @media (max-height: 600px) {
+    .word { font-size: 22px; }
+    .speak-btn { width: 34px; height: 34px; }
+    .option { font-size: 16px; }
+    .topbar { margin-bottom: 4px; }
+    .home-title { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- TOP BAR -->
+    <div class="topbar">
+      <div class="logo" id="logoBtn">Word Quest <span class="star">★</span></div>
+      <div class="stats" id="topStats">
+        <div class="stat mastered" id="masteredStat">✅ <span id="mastered">0</span>/<span id="total">0</span></div>
+        <div class="stat score"><span>🏆</span><span id="score">0</span></div>
+        <div class="stat streak"><span>🔥</span><span id="streak">0</span></div>
+      </div>
+      <button class="icon-btn home" id="homeBtn" title="Home">🏠</button>
+    </div>
+
+    <div class="card">
+      <!-- HOME SCREEN -->
+      <div class="home-screen" id="homeScreen">
+        <div class="home-title">Pick a Mode</div>
+        <div class="home-subtitle">How would you like to learn today?</div>
+        <div class="mode-grid">
+          <button class="mode-btn level-play" id="modeLevel">
+            <span class="emoji">🎯</span>
+            <div>
+              <div class="title">Free Play</div>
+              <div class="desc">Pick a language and difficulty level</div>
+            </div>
+          </button>
+          <button class="mode-btn photo" id="modePhoto">
+            <span class="emoji">📷</span>
+            <div>
+              <div class="title">Photo Words</div>
+              <div class="desc">Snap a vocabulary list (printed works best)</div>
+            </div>
+          </button>
+          <button class="mode-btn custom" id="modeCustom">
+            <span class="emoji">📝</span>
+            <div>
+              <div class="title">My Words</div>
+              <div class="desc">Add your own custom word list</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- LANGUAGE PICKER -->
+      <div class="picker-screen hide" id="langScreen">
+        <div class="picker-title">Choose Language</div>
+        <div class="picker-subtitle">Translate English into…</div>
+        <div class="lang-grid" id="langGrid"></div>
+      </div>
+
+      <!-- LEVEL PICKER -->
+      <div class="picker-screen hide" id="levelScreen">
+        <div class="picker-title">Choose Difficulty</div>
+        <div class="picker-subtitle" id="levelSubtitle">5 levels available</div>
+        <div class="level-grid" id="levelGrid"></div>
+      </div>
+
+      <!-- PHOTO SCREEN -->
+      <div class="photo-screen hide" id="photoScreen">
+        <div class="photo-info">
+          📷 Take a photo or upload one of a vocabulary list. <b>Works best with clear printed text.</b> Handwriting may not work well. You'll be able to review and edit the words after.
+        </div>
+        <div class="photo-controls">
+          <label for="photoCamera">📸 Take Photo
+            <input type="file" id="photoCamera" accept="image/*" capture="environment">
+          </label>
+          <label for="photoUpload">📁 Choose File
+            <input type="file" id="photoUpload" accept="image/*">
+          </label>
+        </div>
+        <div class="photo-preview" id="photoPreview"></div>
+        <div class="photo-status" id="photoStatus">Ready when you are 👆</div>
+      </div>
+
+      <!-- CUSTOM LIST EDITOR -->
+      <div class="custom-screen hide" id="customScreen">
+        <div class="custom-add">
+          <input type="text" id="customEn" placeholder="English word" autocomplete="off">
+          <input type="text" id="customTr" placeholder="תרגום" class="he-input" autocomplete="off">
+          <button id="customAdd">+ Add</button>
+        </div>
+        <div class="custom-list" id="customList"></div>
+        <div class="custom-actions">
+          <button class="clear" id="customClear">🗑 Clear All</button>
+          <button class="play" id="customPlay">▶ Play (<span id="customCount">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- GAME SCREEN -->
+      <div class="game-screen hide" id="gameScreen">
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progressBar"></div>
+          <div class="progress-label" id="progressLabel">0 / 0 mastered</div>
+        </div>
+
+        <div class="question">
+          <div class="word-row">
+            <div class="word" id="word">word</div>
+            <button class="speak-btn" id="speakBtn" aria-label="Hear word">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="options" id="options"></div>
+
+        <div class="bottom-bar">
+          <div class="feedback" id="feedback">
+            <span class="emoji" id="feedbackEmoji">🎉</span><span id="feedbackText">Correct!</span>
+          </div>
+          <button class="next-btn" id="nextBtn">Next Word →</button>
+        </div>
+      </div>
+
+      <!-- ALL DONE -->
+      <div class="all-done" id="allDone">
+        <div class="big-emoji">🏆</div>
+        <div class="title">All Mastered!</div>
+        <div class="sub">Amazing! Pick another mode to keep learning.</div>
+        <button id="restartHome">Back to Home 🏠</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // ===== Viewport fix for mobile =====
+  function setVH() {
+    document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+  }
+  setVH();
+  window.addEventListener('resize', setVH);
+  window.addEventListener('orientationchange', setVH);
+
+  // ===== Dictionary will be inlined here =====
+  // Dictionary structure: DICTIONARY[level][english] = { he, es, fr, de, ru, ja }
+// Level 1 = simplest (toddler/preschool), Level 5 = academic/advanced
+// 6 languages: Hebrew, Spanish, French, German, Russian, Japanese
+
+const DICTIONARY = {
+  1: {
+    // Level 1: First words — animals, family, body, basic actions/objects (~100 words)
+    "mom":     { he: "אִמָּא", es: "mamá", fr: "maman", de: "Mama", ru: "мама", ja: "ママ" },
+    "dad":     { he: "אַבָּא", es: "papá", fr: "papa", de: "Papa", ru: "папа", ja: "パパ" },
+    "baby":    { he: "תִּינוֹק", es: "bebé", fr: "bébé", de: "Baby", ru: "малыш", ja: "赤ちゃん" },
+    "boy":     { he: "יֶלֶד", es: "niño", fr: "garçon", de: "Junge", ru: "мальчик", ja: "男の子" },
+    "girl":    { he: "יַלְדָּה", es: "niña", fr: "fille", de: "Mädchen", ru: "девочка", ja: "女の子" },
+    "dog":     { he: "כֶּלֶב", es: "perro", fr: "chien", de: "Hund", ru: "собака", ja: "犬" },
+    "cat":     { he: "חָתוּל", es: "gato", fr: "chat", de: "Katze", ru: "кот", ja: "猫" },
+    "fish":    { he: "דָּג", es: "pez", fr: "poisson", de: "Fisch", ru: "рыба", ja: "魚" },
+    "bird":    { he: "צִפּוֹר", es: "pájaro", fr: "oiseau", de: "Vogel", ru: "птица", ja: "鳥" },
+    "cow":     { he: "פָּרָה", es: "vaca", fr: "vache", de: "Kuh", ru: "корова", ja: "牛" },
+    "horse":   { he: "סוּס", es: "caballo", fr: "cheval", de: "Pferd", ru: "лошадь", ja: "馬" },
+    "pig":     { he: "חֲזִיר", es: "cerdo", fr: "cochon", de: "Schwein", ru: "свинья", ja: "豚" },
+    "duck":    { he: "בַּרְוָז", es: "pato", fr: "canard", de: "Ente", ru: "утка", ja: "アヒル" },
+    "bear":    { he: "דֹּב", es: "oso", fr: "ours", de: "Bär", ru: "медведь", ja: "クマ" },
+    "lion":    { he: "אַרְיֵה", es: "león", fr: "lion", de: "Löwe", ru: "лев", ja: "ライオン" },
+    "monkey":  { he: "קוֹף", es: "mono", fr: "singe", de: "Affe", ru: "обезьяна", ja: "サル" },
+    "elephant":{ he: "פִּיל", es: "elefante", fr: "éléphant", de: "Elefant", ru: "слон", ja: "象" },
+    "rabbit":  { he: "אַרְנָב", es: "conejo", fr: "lapin", de: "Hase", ru: "кролик", ja: "うさぎ" },
+    "mouse":   { he: "עַכְבָּר", es: "ratón", fr: "souris", de: "Maus", ru: "мышь", ja: "ネズミ" },
+    "hand":    { he: "יָד", es: "mano", fr: "main", de: "Hand", ru: "рука", ja: "手" },
+    "foot":    { he: "רֶגֶל", es: "pie", fr: "pied", de: "Fuß", ru: "нога", ja: "足" },
+    "eye":     { he: "עַיִן", es: "ojo", fr: "œil", de: "Auge", ru: "глаз", ja: "目" },
+    "nose":    { he: "אַף", es: "nariz", fr: "nez", de: "Nase", ru: "нос", ja: "鼻" },
+    "mouth":   { he: "פֶּה", es: "boca", fr: "bouche", de: "Mund", ru: "рот", ja: "口" },
+    "ear":     { he: "אֹזֶן", es: "oreja", fr: "oreille", de: "Ohr", ru: "ухо", ja: "耳" },
+    "hair":    { he: "שֵׂעָר", es: "pelo", fr: "cheveux", de: "Haar", ru: "волосы", ja: "髪" },
+    "head":    { he: "רֹאשׁ", es: "cabeza", fr: "tête", de: "Kopf", ru: "голова", ja: "頭" },
+    "red":     { he: "אָדוֹם", es: "rojo", fr: "rouge", de: "rot", ru: "красный", ja: "赤" },
+    "blue":    { he: "כָּחֹל", es: "azul", fr: "bleu", de: "blau", ru: "синий", ja: "青" },
+    "green":   { he: "יָרֹק", es: "verde", fr: "vert", de: "grün", ru: "зелёный", ja: "緑" },
+    "yellow":  { he: "צָהֹב", es: "amarillo", fr: "jaune", de: "gelb", ru: "жёлтый", ja: "黄色" },
+    "black":   { he: "שָׁחֹר", es: "negro", fr: "noir", de: "schwarz", ru: "чёрный", ja: "黒" },
+    "white":   { he: "לָבָן", es: "blanco", fr: "blanc", de: "weiß", ru: "белый", ja: "白" },
+    "pink":    { he: "וָרֹד", es: "rosa", fr: "rose", de: "rosa", ru: "розовый", ja: "ピンク" },
+    "orange":  { he: "כָּתֹם", es: "naranja", fr: "orange", de: "orange", ru: "оранжевый", ja: "オレンジ" },
+    "purple":  { he: "סָגֹל", es: "morado", fr: "violet", de: "lila", ru: "фиолетовый", ja: "紫" },
+    "one":     { he: "אֶחָד", es: "uno", fr: "un", de: "eins", ru: "один", ja: "一" },
+    "two":     { he: "שְׁתַּיִם", es: "dos", fr: "deux", de: "zwei", ru: "два", ja: "二" },
+    "three":   { he: "שָׁלוֹשׁ", es: "tres", fr: "trois", de: "drei", ru: "три", ja: "三" },
+    "four":    { he: "אַרְבַּע", es: "cuatro", fr: "quatre", de: "vier", ru: "четыре", ja: "四" },
+    "five":    { he: "חָמֵשׁ", es: "cinco", fr: "cinq", de: "fünf", ru: "пять", ja: "五" },
+    "six":     { he: "שֵׁשׁ", es: "seis", fr: "six", de: "sechs", ru: "шесть", ja: "六" },
+    "seven":   { he: "שֶׁבַע", es: "siete", fr: "sept", de: "sieben", ru: "семь", ja: "七" },
+    "eight":   { he: "שְׁמוֹנֶה", es: "ocho", fr: "huit", de: "acht", ru: "восемь", ja: "八" },
+    "nine":    { he: "תֵּשַׁע", es: "nueve", fr: "neuf", de: "neun", ru: "девять", ja: "九" },
+    "ten":     { he: "עֶשֶׂר", es: "diez", fr: "dix", de: "zehn", ru: "десять", ja: "十" },
+    "yes":     { he: "כֵּן", es: "sí", fr: "oui", de: "ja", ru: "да", ja: "はい" },
+    "no":      { he: "לֹא", es: "no", fr: "non", de: "nein", ru: "нет", ja: "いいえ" },
+    "hi":      { he: "שָׁלוֹם", es: "hola", fr: "salut", de: "hallo", ru: "привет", ja: "こんにちは" },
+    "bye":     { he: "לְהִתְרָאוֹת", es: "adiós", fr: "au revoir", de: "tschüss", ru: "пока", ja: "さようなら" },
+    "water":   { he: "מַיִם", es: "agua", fr: "eau", de: "Wasser", ru: "вода", ja: "水" },
+    "milk":    { he: "חָלָב", es: "leche", fr: "lait", de: "Milch", ru: "молоко", ja: "牛乳" },
+    "bread":   { he: "לֶחֶם", es: "pan", fr: "pain", de: "Brot", ru: "хлеб", ja: "パン" },
+    "apple":   { he: "תַּפּוּחַ", es: "manzana", fr: "pomme", de: "Apfel", ru: "яблоко", ja: "りんご" },
+    "banana":  { he: "בָּנָנָה", es: "plátano", fr: "banane", de: "Banane", ru: "банан", ja: "バナナ" },
+    "egg":     { he: "בֵּיצָה", es: "huevo", fr: "œuf", de: "Ei", ru: "яйцо", ja: "卵" },
+    "cake":    { he: "עוּגָה", es: "pastel", fr: "gâteau", de: "Kuchen", ru: "торт", ja: "ケーキ" },
+    "ice cream":{ he: "גְּלִידָה", es: "helado", fr: "glace", de: "Eis", ru: "мороженое", ja: "アイスクリーム" },
+    "sun":     { he: "שֶׁמֶשׁ", es: "sol", fr: "soleil", de: "Sonne", ru: "солнце", ja: "太陽" },
+    "moon":    { he: "יָרֵחַ", es: "luna", fr: "lune", de: "Mond", ru: "луна", ja: "月" },
+    "star":    { he: "כּוֹכָב", es: "estrella", fr: "étoile", de: "Stern", ru: "звезда", ja: "星" },
+    "tree":    { he: "עֵץ", es: "árbol", fr: "arbre", de: "Baum", ru: "дерево", ja: "木" },
+    "flower":  { he: "פֶּרַח", es: "flor", fr: "fleur", de: "Blume", ru: "цветок", ja: "花" },
+    "house":   { he: "בַּיִת", es: "casa", fr: "maison", de: "Haus", ru: "дом", ja: "家" },
+    "car":     { he: "מְכוֹנִית", es: "coche", fr: "voiture", de: "Auto", ru: "машина", ja: "車" },
+    "ball":    { he: "כַּדּוּר", es: "pelota", fr: "ballon", de: "Ball", ru: "мяч", ja: "ボール" },
+    "book":    { he: "סֵפֶר", es: "libro", fr: "livre", de: "Buch", ru: "книга", ja: "本" },
+    "toy":     { he: "צַעֲצוּעַ", es: "juguete", fr: "jouet", de: "Spielzeug", ru: "игрушка", ja: "おもちゃ" },
+    "doll":    { he: "בּוּבָּה", es: "muñeca", fr: "poupée", de: "Puppe", ru: "кукла", ja: "人形" },
+    "bed":     { he: "מִטָּה", es: "cama", fr: "lit", de: "Bett", ru: "кровать", ja: "ベッド" },
+    "chair":   { he: "כִּסֵּא", es: "silla", fr: "chaise", de: "Stuhl", ru: "стул", ja: "椅子" },
+    "table":   { he: "שֻׁלְחָן", es: "mesa", fr: "table", de: "Tisch", ru: "стол", ja: "テーブル" },
+    "door":    { he: "דֶּלֶת", es: "puerta", fr: "porte", de: "Tür", ru: "дверь", ja: "ドア" },
+    "window":  { he: "חַלּוֹן", es: "ventana", fr: "fenêtre", de: "Fenster", ru: "окно", ja: "窓" },
+    "shoe":    { he: "נַעַל", es: "zapato", fr: "chaussure", de: "Schuh", ru: "ботинок", ja: "靴" },
+    "hat":     { he: "כּוֹבַע", es: "sombrero", fr: "chapeau", de: "Hut", ru: "шляпа", ja: "帽子" },
+    "shirt":   { he: "חוּלְצָה", es: "camisa", fr: "chemise", de: "Hemd", ru: "рубашка", ja: "シャツ" },
+    "play":    { he: "לְשַׂחֵק", es: "jugar", fr: "jouer", de: "spielen", ru: "играть", ja: "遊ぶ" },
+    "eat":     { he: "לֶאֱכוֹל", es: "comer", fr: "manger", de: "essen", ru: "есть", ja: "食べる" },
+    "drink":   { he: "לִשְׁתּוֹת", es: "beber", fr: "boire", de: "trinken", ru: "пить", ja: "飲む" },
+    "sleep":   { he: "לִישׁוֹן", es: "dormir", fr: "dormir", de: "schlafen", ru: "спать", ja: "寝る" },
+    "run":     { he: "לָרוּץ", es: "correr", fr: "courir", de: "laufen", ru: "бежать", ja: "走る" },
+    "walk":    { he: "לָלֶכֶת", es: "caminar", fr: "marcher", de: "gehen", ru: "идти", ja: "歩く" },
+    "jump":    { he: "לִקְפֹּץ", es: "saltar", fr: "sauter", de: "springen", ru: "прыгать", ja: "跳ぶ" },
+    "see":     { he: "לִרְאוֹת", es: "ver", fr: "voir", de: "sehen", ru: "видеть", ja: "見る" },
+    "go":      { he: "לָלֶכֶת", es: "ir", fr: "aller", de: "gehen", ru: "идти", ja: "行く" },
+    "come":    { he: "לָבוֹא", es: "venir", fr: "venir", de: "kommen", ru: "приходить", ja: "来る" },
+    "big":     { he: "גָּדוֹל", es: "grande", fr: "grand", de: "groß", ru: "большой", ja: "大きい" },
+    "small":   { he: "קָטָן", es: "pequeño", fr: "petit", de: "klein", ru: "маленький", ja: "小さい" },
+    "hot":     { he: "חַם", es: "caliente", fr: "chaud", de: "heiß", ru: "горячий", ja: "熱い" },
+    "cold":    { he: "קַר", es: "frío", fr: "froid", de: "kalt", ru: "холодный", ja: "寒い" },
+    "good":    { he: "טוֹב", es: "bueno", fr: "bon", de: "gut", ru: "хороший", ja: "良い" },
+    "bad":     { he: "רַע", es: "malo", fr: "mauvais", de: "schlecht", ru: "плохой", ja: "悪い" },
+    "happy":   { he: "שָׂמֵחַ", es: "feliz", fr: "heureux", de: "glücklich", ru: "счастливый", ja: "嬉しい" },
+    "sad":     { he: "עָצוּב", es: "triste", fr: "triste", de: "traurig", ru: "грустный", ja: "悲しい" },
+    "I":       { he: "אֲנִי", es: "yo", fr: "je", de: "ich", ru: "я", ja: "私" },
+    "you":     { he: "אַתָּה", es: "tú", fr: "tu", de: "du", ru: "ты", ja: "あなた" },
+    "we":      { he: "אֲנַחְנוּ", es: "nosotros", fr: "nous", de: "wir", ru: "мы", ja: "私たち" },
+    "they":    { he: "הֵם", es: "ellos", fr: "ils", de: "sie", ru: "они", ja: "彼ら" }
+  },
+
+  2: {
+    // Level 2: Early school — common nouns, verbs, adjectives (~100 words)
+    "school":  { he: "בֵּית סֵפֶר", es: "escuela", fr: "école", de: "Schule", ru: "школа", ja: "学校" },
+    "teacher": { he: "מוֹרֶה", es: "profesor", fr: "professeur", de: "Lehrer", ru: "учитель", ja: "先生" },
+    "student": { he: "תַּלְמִיד", es: "estudiante", fr: "étudiant", de: "Schüler", ru: "ученик", ja: "学生" },
+    "friend":  { he: "חָבֵר", es: "amigo", fr: "ami", de: "Freund", ru: "друг", ja: "友達" },
+    "family":  { he: "מִשְׁפָּחָה", es: "familia", fr: "famille", de: "Familie", ru: "семья", ja: "家族" },
+    "brother": { he: "אָח", es: "hermano", fr: "frère", de: "Bruder", ru: "брат", ja: "兄弟" },
+    "sister":  { he: "אָחוֹת", es: "hermana", fr: "sœur", de: "Schwester", ru: "сестра", ja: "姉妹" },
+    "morning": { he: "בֹּקֶר", es: "mañana", fr: "matin", de: "Morgen", ru: "утро", ja: "朝" },
+    "night":   { he: "לַיְלָה", es: "noche", fr: "nuit", de: "Nacht", ru: "ночь", ja: "夜" },
+    "day":     { he: "יוֹם", es: "día", fr: "jour", de: "Tag", ru: "день", ja: "日" },
+    "week":    { he: "שָׁבוּעַ", es: "semana", fr: "semaine", de: "Woche", ru: "неделя", ja: "週" },
+    "month":   { he: "חוֹדֶשׁ", es: "mes", fr: "mois", de: "Monat", ru: "месяц", ja: "月" },
+    "year":    { he: "שָׁנָה", es: "año", fr: "année", de: "Jahr", ru: "год", ja: "年" },
+    "summer":  { he: "קַיִץ", es: "verano", fr: "été", de: "Sommer", ru: "лето", ja: "夏" },
+    "winter":  { he: "חוֹרֶף", es: "invierno", fr: "hiver", de: "Winter", ru: "зима", ja: "冬" },
+    "spring":  { he: "אָבִיב", es: "primavera", fr: "printemps", de: "Frühling", ru: "весна", ja: "春" },
+    "autumn":  { he: "סְתָיו", es: "otoño", fr: "automne", de: "Herbst", ru: "осень", ja: "秋" },
+    "rain":    { he: "גֶּשֶׁם", es: "lluvia", fr: "pluie", de: "Regen", ru: "дождь", ja: "雨" },
+    "snow":    { he: "שֶׁלֶג", es: "nieve", fr: "neige", de: "Schnee", ru: "снег", ja: "雪" },
+    "wind":    { he: "רוּחַ", es: "viento", fr: "vent", de: "Wind", ru: "ветер", ja: "風" },
+    "cloud":   { he: "עָנָן", es: "nube", fr: "nuage", de: "Wolke", ru: "облако", ja: "雲" },
+    "sky":     { he: "שָׁמַיִם", es: "cielo", fr: "ciel", de: "Himmel", ru: "небо", ja: "空" },
+    "sea":     { he: "יָם", es: "mar", fr: "mer", de: "Meer", ru: "море", ja: "海" },
+    "river":   { he: "נָהָר", es: "río", fr: "rivière", de: "Fluss", ru: "река", ja: "川" },
+    "mountain":{ he: "הַר", es: "montaña", fr: "montagne", de: "Berg", ru: "гора", ja: "山" },
+    "forest":  { he: "יַעַר", es: "bosque", fr: "forêt", de: "Wald", ru: "лес", ja: "森" },
+    "city":    { he: "עִיר", es: "ciudad", fr: "ville", de: "Stadt", ru: "город", ja: "都市" },
+    "park":    { he: "פַּארְק", es: "parque", fr: "parc", de: "Park", ru: "парк", ja: "公園" },
+    "street":  { he: "רְחוֹב", es: "calle", fr: "rue", de: "Straße", ru: "улица", ja: "通り" },
+    "shop":    { he: "חֲנוּת", es: "tienda", fr: "magasin", de: "Geschäft", ru: "магазин", ja: "店" },
+    "money":   { he: "כֶּסֶף", es: "dinero", fr: "argent", de: "Geld", ru: "деньги", ja: "お金" },
+    "food":    { he: "אֹכֶל", es: "comida", fr: "nourriture", de: "Essen", ru: "еда", ja: "食べ物" },
+    "rice":    { he: "אֹרֶז", es: "arroz", fr: "riz", de: "Reis", ru: "рис", ja: "ご飯" },
+    "meat":    { he: "בָּשָׂר", es: "carne", fr: "viande", de: "Fleisch", ru: "мясо", ja: "肉" },
+    "fruit":   { he: "פְּרִי", es: "fruta", fr: "fruit", de: "Obst", ru: "фрукт", ja: "果物" },
+    "orange (fruit)": { he: "תַּפּוּז", es: "naranja", fr: "orange", de: "Orange", ru: "апельсин", ja: "オレンジ" },
+    "grape":   { he: "עֵנָב", es: "uva", fr: "raisin", de: "Traube", ru: "виноград", ja: "ぶどう" },
+    "tea":     { he: "תֵּה", es: "té", fr: "thé", de: "Tee", ru: "чай", ja: "お茶" },
+    "coffee":  { he: "קָפֶה", es: "café", fr: "café", de: "Kaffee", ru: "кофе", ja: "コーヒー" },
+    "juice":   { he: "מִיץ", es: "jugo", fr: "jus", de: "Saft", ru: "сок", ja: "ジュース" },
+    "salt":    { he: "מֶלַח", es: "sal", fr: "sel", de: "Salz", ru: "соль", ja: "塩" },
+    "sugar":   { he: "סֻכָּר", es: "azúcar", fr: "sucre", de: "Zucker", ru: "сахар", ja: "砂糖" },
+    "open":    { he: "לִפְתֹּחַ", es: "abrir", fr: "ouvrir", de: "öffnen", ru: "открывать", ja: "開ける" },
+    "close":   { he: "לִסְגֹּר", es: "cerrar", fr: "fermer", de: "schließen", ru: "закрывать", ja: "閉める" },
+    "give":    { he: "לָתֵת", es: "dar", fr: "donner", de: "geben", ru: "давать", ja: "あげる" },
+    "take":    { he: "לָקַחַת", es: "tomar", fr: "prendre", de: "nehmen", ru: "брать", ja: "取る" },
+    "read":    { he: "לִקְרֹא", es: "leer", fr: "lire", de: "lesen", ru: "читать", ja: "読む" },
+    "write":   { he: "לִכְתֹּב", es: "escribir", fr: "écrire", de: "schreiben", ru: "писать", ja: "書く" },
+    "speak":   { he: "לְדַבֵּר", es: "hablar", fr: "parler", de: "sprechen", ru: "говорить", ja: "話す" },
+    "listen":  { he: "לְהַקְשִׁיב", es: "escuchar", fr: "écouter", de: "hören", ru: "слушать", ja: "聞く" },
+    "learn":   { he: "לִלְמֹד", es: "aprender", fr: "apprendre", de: "lernen", ru: "учить", ja: "学ぶ" },
+    "work":    { he: "לַעֲבֹד", es: "trabajar", fr: "travailler", de: "arbeiten", ru: "работать", ja: "働く" },
+    "sing":    { he: "לָשִׁיר", es: "cantar", fr: "chanter", de: "singen", ru: "петь", ja: "歌う" },
+    "dance":   { he: "לִרְקֹד", es: "bailar", fr: "danser", de: "tanzen", ru: "танцевать", ja: "踊る" },
+    "swim":    { he: "לִשְׂחוֹת", es: "nadar", fr: "nager", de: "schwimmen", ru: "плавать", ja: "泳ぐ" },
+    "fly":     { he: "לָעוּף", es: "volar", fr: "voler", de: "fliegen", ru: "летать", ja: "飛ぶ" },
+    "buy":     { he: "לִקְנוֹת", es: "comprar", fr: "acheter", de: "kaufen", ru: "покупать", ja: "買う" },
+    "sell":    { he: "לִמְכֹּר", es: "vender", fr: "vendre", de: "verkaufen", ru: "продавать", ja: "売る" },
+    "help":    { he: "לַעֲזֹר", es: "ayudar", fr: "aider", de: "helfen", ru: "помогать", ja: "助ける" },
+    "love":    { he: "לֶאֱהֹב", es: "amar", fr: "aimer", de: "lieben", ru: "любить", ja: "愛する" },
+    "like":    { he: "לֶאֱהֹב", es: "gustar", fr: "aimer", de: "mögen", ru: "нравиться", ja: "好き" },
+    "want":    { he: "לִרְצוֹת", es: "querer", fr: "vouloir", de: "wollen", ru: "хотеть", ja: "欲しい" },
+    "need":    { he: "לִצְרֹךְ", es: "necesitar", fr: "avoir besoin", de: "brauchen", ru: "нуждаться", ja: "必要" },
+    "think":   { he: "לַחְשֹׁב", es: "pensar", fr: "penser", de: "denken", ru: "думать", ja: "考える" },
+    "know":    { he: "לָדַעַת", es: "saber", fr: "savoir", de: "wissen", ru: "знать", ja: "知る" },
+    "say":     { he: "לוֹמַר", es: "decir", fr: "dire", de: "sagen", ru: "сказать", ja: "言う" },
+    "ask":     { he: "לִשְׁאֹל", es: "preguntar", fr: "demander", de: "fragen", ru: "спрашивать", ja: "尋ねる" },
+    "answer":  { he: "לַעֲנוֹת", es: "responder", fr: "répondre", de: "antworten", ru: "отвечать", ja: "答える" },
+    "long":    { he: "אָרֹךְ", es: "largo", fr: "long", de: "lang", ru: "длинный", ja: "長い" },
+    "short":   { he: "קָצָר", es: "corto", fr: "court", de: "kurz", ru: "короткий", ja: "短い" },
+    "fast":    { he: "מָהִיר", es: "rápido", fr: "rapide", de: "schnell", ru: "быстрый", ja: "速い" },
+    "slow":    { he: "אִטִּי", es: "lento", fr: "lent", de: "langsam", ru: "медленный", ja: "遅い" },
+    "easy":    { he: "קַל", es: "fácil", fr: "facile", de: "leicht", ru: "лёгкий", ja: "簡単" },
+    "hard":    { he: "קָשֶׁה", es: "difícil", fr: "difficile", de: "schwer", ru: "трудный", ja: "難しい" },
+    "new":     { he: "חָדָשׁ", es: "nuevo", fr: "nouveau", de: "neu", ru: "новый", ja: "新しい" },
+    "old":     { he: "יָשָׁן", es: "viejo", fr: "vieux", de: "alt", ru: "старый", ja: "古い" },
+    "young":   { he: "צָעִיר", es: "joven", fr: "jeune", de: "jung", ru: "молодой", ja: "若い" },
+    "beautiful":{ he: "יָפֶה", es: "hermoso", fr: "beau", de: "schön", ru: "красивый", ja: "美しい" },
+    "ugly":    { he: "מְכֹעָר", es: "feo", fr: "laid", de: "hässlich", ru: "уродливый", ja: "醜い" },
+    "clean":   { he: "נָקִי", es: "limpio", fr: "propre", de: "sauber", ru: "чистый", ja: "きれい" },
+    "dirty":   { he: "מְלֻכְלָךְ", es: "sucio", fr: "sale", de: "schmutzig", ru: "грязный", ja: "汚い" },
+    "rich":    { he: "עָשִׁיר", es: "rico", fr: "riche", de: "reich", ru: "богатый", ja: "金持ち" },
+    "poor":    { he: "עָנִי", es: "pobre", fr: "pauvre", de: "arm", ru: "бедный", ja: "貧しい" },
+    "strong":  { he: "חָזָק", es: "fuerte", fr: "fort", de: "stark", ru: "сильный", ja: "強い" },
+    "weak":    { he: "חַלָּשׁ", es: "débil", fr: "faible", de: "schwach", ru: "слабый", ja: "弱い" },
+    "near":    { he: "קָרוֹב", es: "cerca", fr: "près", de: "nah", ru: "близко", ja: "近い" },
+    "far":     { he: "רָחוֹק", es: "lejos", fr: "loin", de: "weit", ru: "далеко", ja: "遠い" },
+    "high":    { he: "גָּבוֹהַּ", es: "alto", fr: "haut", de: "hoch", ru: "высокий", ja: "高い" },
+    "low":     { he: "נָמוּךְ", es: "bajo", fr: "bas", de: "niedrig", ru: "низкий", ja: "低い" },
+    "left":    { he: "שְׂמֹאל", es: "izquierda", fr: "gauche", de: "links", ru: "слева", ja: "左" },
+    "right":   { he: "יָמִין", es: "derecha", fr: "droite", de: "rechts", ru: "справа", ja: "右" },
+    "up":      { he: "לְמַעְלָה", es: "arriba", fr: "haut", de: "oben", ru: "вверх", ja: "上" },
+    "down":    { he: "לְמַטָּה", es: "abajo", fr: "bas", de: "unten", ru: "вниз", ja: "下" },
+    "in":      { he: "בְּ", es: "en", fr: "dans", de: "in", ru: "в", ja: "中" },
+    "out":     { he: "מִחוּץ", es: "fuera", fr: "dehors", de: "draußen", ru: "снаружи", ja: "外" },
+    "with":    { he: "עִם", es: "con", fr: "avec", de: "mit", ru: "с", ja: "と" },
+    "without": { he: "בְּלִי", es: "sin", fr: "sans", de: "ohne", ru: "без", ja: "なし" },
+    "before":  { he: "לִפְנֵי", es: "antes", fr: "avant", de: "vor", ru: "до", ja: "前" },
+    "after":   { he: "אַחֲרֵי", es: "después", fr: "après", de: "nach", ru: "после", ja: "後" }
+  },
+
+  3: {
+    // Level 3: Intermediate — daily life, emotions, more verbs (~100 words)
+    "breakfast":{ he: "אֲרוּחַת בֹּקֶר", es: "desayuno", fr: "petit-déjeuner", de: "Frühstück", ru: "завтрак", ja: "朝食" },
+    "lunch":   { he: "אֲרוּחַת צָהֳרַיִם", es: "almuerzo", fr: "déjeuner", de: "Mittagessen", ru: "обед", ja: "昼食" },
+    "dinner":  { he: "אֲרוּחַת עֶרֶב", es: "cena", fr: "dîner", de: "Abendessen", ru: "ужин", ja: "夕食" },
+    "kitchen": { he: "מִטְבָּח", es: "cocina", fr: "cuisine", de: "Küche", ru: "кухня", ja: "台所" },
+    "bathroom":{ he: "אַמְבַּטְיָה", es: "baño", fr: "salle de bain", de: "Badezimmer", ru: "ванная", ja: "浴室" },
+    "bedroom": { he: "חֲדַר שֵׁנָה", es: "dormitorio", fr: "chambre", de: "Schlafzimmer", ru: "спальня", ja: "寝室" },
+    "garden":  { he: "גַּן", es: "jardín", fr: "jardin", de: "Garten", ru: "сад", ja: "庭" },
+    "office":  { he: "מִשְׂרָד", es: "oficina", fr: "bureau", de: "Büro", ru: "офис", ja: "オフィス" },
+    "hospital":{ he: "בֵּית חוֹלִים", es: "hospital", fr: "hôpital", de: "Krankenhaus", ru: "больница", ja: "病院" },
+    "doctor":  { he: "רוֹפֵא", es: "médico", fr: "médecin", de: "Arzt", ru: "врач", ja: "医者" },
+    "nurse":   { he: "אָחוֹת", es: "enfermera", fr: "infirmière", de: "Krankenschwester", ru: "медсестра", ja: "看護師" },
+    "police":  { he: "מִשְׁטָרָה", es: "policía", fr: "police", de: "Polizei", ru: "полиция", ja: "警察" },
+    "soldier": { he: "חַיָּל", es: "soldado", fr: "soldat", de: "Soldat", ru: "солдат", ja: "兵士" },
+    "farmer":  { he: "חַקְלַאי", es: "agricultor", fr: "fermier", de: "Bauer", ru: "фермер", ja: "農家" },
+    "cook":    { he: "טַבָּח", es: "cocinero", fr: "cuisinier", de: "Koch", ru: "повар", ja: "料理人" },
+    "driver":  { he: "נֶהָג", es: "conductor", fr: "chauffeur", de: "Fahrer", ru: "водитель", ja: "運転手" },
+    "letter":  { he: "מִכְתָּב", es: "carta", fr: "lettre", de: "Brief", ru: "письмо", ja: "手紙" },
+    "phone":   { he: "טֵלֵפוֹן", es: "teléfono", fr: "téléphone", de: "Telefon", ru: "телефон", ja: "電話" },
+    "computer":{ he: "מַחְשֵׁב", es: "computadora", fr: "ordinateur", de: "Computer", ru: "компьютер", ja: "コンピュータ" },
+    "movie":   { he: "סֶרֶט", es: "película", fr: "film", de: "Film", ru: "фильм", ja: "映画" },
+    "music":   { he: "מוּזִיקָה", es: "música", fr: "musique", de: "Musik", ru: "музыка", ja: "音楽" },
+    "song":    { he: "שִׁיר", es: "canción", fr: "chanson", de: "Lied", ru: "песня", ja: "歌" },
+    "story":   { he: "סִפּוּר", es: "historia", fr: "histoire", de: "Geschichte", ru: "история", ja: "物語" },
+    "game":    { he: "מִשְׂחָק", es: "juego", fr: "jeu", de: "Spiel", ru: "игра", ja: "ゲーム" },
+    "sport":   { he: "סְפּוֹרְט", es: "deporte", fr: "sport", de: "Sport", ru: "спорт", ja: "スポーツ" },
+    "football":{ he: "כַּדּוּרֶגֶל", es: "fútbol", fr: "football", de: "Fußball", ru: "футбол", ja: "サッカー" },
+    "basketball":{ he: "כַּדּוּרְסַל", es: "baloncesto", fr: "basket-ball", de: "Basketball", ru: "баскетбол", ja: "バスケットボール" },
+    "team":    { he: "קְבוּצָה", es: "equipo", fr: "équipe", de: "Team", ru: "команда", ja: "チーム" },
+    "win":     { he: "לְנַצֵּחַ", es: "ganar", fr: "gagner", de: "gewinnen", ru: "выигрывать", ja: "勝つ" },
+    "lose":    { he: "לְהַפְסִיד", es: "perder", fr: "perdre", de: "verlieren", ru: "проигрывать", ja: "負ける" },
+    "begin":   { he: "לְהַתְחִיל", es: "comenzar", fr: "commencer", de: "beginnen", ru: "начинать", ja: "始める" },
+    "finish":  { he: "לְסַיֵּם", es: "terminar", fr: "finir", de: "beenden", ru: "заканчивать", ja: "終える" },
+    "try":     { he: "לְנַסּוֹת", es: "intentar", fr: "essayer", de: "versuchen", ru: "пытаться", ja: "試す" },
+    "remember":{ he: "לִזְכֹּר", es: "recordar", fr: "se souvenir", de: "erinnern", ru: "помнить", ja: "覚える" },
+    "forget":  { he: "לִשְׁכֹּחַ", es: "olvidar", fr: "oublier", de: "vergessen", ru: "забывать", ja: "忘れる" },
+    "understand":{ he: "לְהָבִין", es: "entender", fr: "comprendre", de: "verstehen", ru: "понимать", ja: "理解する" },
+    "explain": { he: "לְהַסְבִּיר", es: "explicar", fr: "expliquer", de: "erklären", ru: "объяснять", ja: "説明する" },
+    "show":    { he: "לְהַרְאוֹת", es: "mostrar", fr: "montrer", de: "zeigen", ru: "показывать", ja: "見せる" },
+    "find":    { he: "לִמְצֹא", es: "encontrar", fr: "trouver", de: "finden", ru: "находить", ja: "見つける" },
+    "lose (something)":{ he: "לְאַבֵּד", es: "perder", fr: "perdre", de: "verlieren", ru: "терять", ja: "失う" },
+    "wait":    { he: "לְחַכּוֹת", es: "esperar", fr: "attendre", de: "warten", ru: "ждать", ja: "待つ" },
+    "stop":    { he: "לַעֲצֹר", es: "parar", fr: "arrêter", de: "stoppen", ru: "останавливать", ja: "止める" },
+    "start":   { he: "לְהַתְחִיל", es: "empezar", fr: "commencer", de: "starten", ru: "начинать", ja: "スタート" },
+    "carry":   { he: "לִנְשֹׂא", es: "llevar", fr: "porter", de: "tragen", ru: "нести", ja: "運ぶ" },
+    "push":    { he: "לִדְחֹף", es: "empujar", fr: "pousser", de: "drücken", ru: "толкать", ja: "押す" },
+    "pull":    { he: "לִמְשֹׁךְ", es: "tirar", fr: "tirer", de: "ziehen", ru: "тянуть", ja: "引く" },
+    "throw":   { he: "לִזְרֹק", es: "lanzar", fr: "lancer", de: "werfen", ru: "бросать", ja: "投げる" },
+    "catch":   { he: "לִתְפֹּס", es: "atrapar", fr: "attraper", de: "fangen", ru: "ловить", ja: "捕まえる" },
+    "break":   { he: "לִשְׁבֹּר", es: "romper", fr: "casser", de: "brechen", ru: "ломать", ja: "壊す" },
+    "fix":     { he: "לְתַקֵּן", es: "arreglar", fr: "réparer", de: "reparieren", ru: "чинить", ja: "直す" },
+    "wash":    { he: "לִרְחֹץ", es: "lavar", fr: "laver", de: "waschen", ru: "мыть", ja: "洗う" },
+    "cook":    { he: "לְבַשֵּׁל", es: "cocinar", fr: "cuisiner", de: "kochen", ru: "готовить", ja: "料理する" },
+    "wear":    { he: "לִלְבּוֹשׁ", es: "llevar", fr: "porter", de: "tragen", ru: "носить", ja: "着る" },
+    "afraid":  { he: "פּוֹחֵד", es: "asustado", fr: "effrayé", de: "ängstlich", ru: "испуганный", ja: "怖い" },
+    "angry":   { he: "כּוֹעֵס", es: "enojado", fr: "fâché", de: "wütend", ru: "сердитый", ja: "怒っている" },
+    "tired":   { he: "עָיֵף", es: "cansado", fr: "fatigué", de: "müde", ru: "уставший", ja: "疲れた" },
+    "hungry":  { he: "רָעֵב", es: "hambriento", fr: "affamé", de: "hungrig", ru: "голодный", ja: "空腹" },
+    "thirsty": { he: "צָמֵא", es: "sediento", fr: "assoiffé", de: "durstig", ru: "жаждущий", ja: "喉が渇いた" },
+    "sick":    { he: "חוֹלֶה", es: "enfermo", fr: "malade", de: "krank", ru: "больной", ja: "病気" },
+    "healthy": { he: "בָּרִיא", es: "sano", fr: "sain", de: "gesund", ru: "здоровый", ja: "健康" },
+    "funny":   { he: "מַצְחִיק", es: "divertido", fr: "drôle", de: "lustig", ru: "смешной", ja: "面白い" },
+    "boring":  { he: "מְשַׁעֲמֵם", es: "aburrido", fr: "ennuyeux", de: "langweilig", ru: "скучный", ja: "退屈" },
+    "important":{ he: "חָשׁוּב", es: "importante", fr: "important", de: "wichtig", ru: "важный", ja: "重要" },
+    "different":{ he: "שׁוֹנֶה", es: "diferente", fr: "différent", de: "verschieden", ru: "разный", ja: "違う" },
+    "same":    { he: "אוֹתוֹ", es: "mismo", fr: "même", de: "gleich", ru: "одинаковый", ja: "同じ" },
+    "true":    { he: "אֲמִתִּי", es: "verdadero", fr: "vrai", de: "wahr", ru: "правда", ja: "本当" },
+    "false":   { he: "שֶׁקֶר", es: "falso", fr: "faux", de: "falsch", ru: "ложный", ja: "嘘" },
+    "answer (noun)":{ he: "תְּשׁוּבָה", es: "respuesta", fr: "réponse", de: "Antwort", ru: "ответ", ja: "答え" },
+    "question":{ he: "שְׁאֵלָה", es: "pregunta", fr: "question", de: "Frage", ru: "вопрос", ja: "質問" },
+    "name":    { he: "שֵׁם", es: "nombre", fr: "nom", de: "Name", ru: "имя", ja: "名前" },
+    "number":  { he: "מִסְפָּר", es: "número", fr: "numéro", de: "Nummer", ru: "номер", ja: "番号" },
+    "letter (alphabet)":{ he: "אוֹת", es: "letra", fr: "lettre", de: "Buchstabe", ru: "буква", ja: "文字" },
+    "word":    { he: "מִלָּה", es: "palabra", fr: "mot", de: "Wort", ru: "слово", ja: "言葉" },
+    "language":{ he: "שָׂפָה", es: "idioma", fr: "langue", de: "Sprache", ru: "язык", ja: "言語" },
+    "country": { he: "אֶרֶץ", es: "país", fr: "pays", de: "Land", ru: "страна", ja: "国" },
+    "world":   { he: "עוֹלָם", es: "mundo", fr: "monde", de: "Welt", ru: "мир", ja: "世界" },
+    "people":  { he: "אֲנָשִׁים", es: "gente", fr: "gens", de: "Leute", ru: "люди", ja: "人々" },
+    "man":     { he: "אִישׁ", es: "hombre", fr: "homme", de: "Mann", ru: "мужчина", ja: "男" },
+    "woman":   { he: "אִשָּׁה", es: "mujer", fr: "femme", de: "Frau", ru: "женщина", ja: "女" },
+    "child":   { he: "יֶלֶד", es: "niño", fr: "enfant", de: "Kind", ru: "ребёнок", ja: "子供" },
+    "life":    { he: "חַיִּים", es: "vida", fr: "vie", de: "Leben", ru: "жизнь", ja: "人生" },
+    "death":   { he: "מָוֶת", es: "muerte", fr: "mort", de: "Tod", ru: "смерть", ja: "死" },
+    "time":    { he: "זְמַן", es: "tiempo", fr: "temps", de: "Zeit", ru: "время", ja: "時間" },
+    "hour":    { he: "שָׁעָה", es: "hora", fr: "heure", de: "Stunde", ru: "час", ja: "時間" },
+    "minute":  { he: "דַּקָּה", es: "minuto", fr: "minute", de: "Minute", ru: "минута", ja: "分" },
+    "today":   { he: "הַיּוֹם", es: "hoy", fr: "aujourd'hui", de: "heute", ru: "сегодня", ja: "今日" },
+    "tomorrow":{ he: "מָחָר", es: "mañana", fr: "demain", de: "morgen", ru: "завтра", ja: "明日" },
+    "yesterday":{ he: "אֶתְמוֹל", es: "ayer", fr: "hier", de: "gestern", ru: "вчера", ja: "昨日" },
+    "always":  { he: "תָּמִיד", es: "siempre", fr: "toujours", de: "immer", ru: "всегда", ja: "いつも" },
+    "never":   { he: "אַף פַּעַם", es: "nunca", fr: "jamais", de: "nie", ru: "никогда", ja: "決して" },
+    "sometimes":{ he: "לִפְעָמִים", es: "a veces", fr: "parfois", de: "manchmal", ru: "иногда", ja: "時々" },
+    "often":   { he: "לְעִתִּים קְרוֹבוֹת", es: "a menudo", fr: "souvent", de: "oft", ru: "часто", ja: "よく" },
+    "early":   { he: "מֻקְדָּם", es: "temprano", fr: "tôt", de: "früh", ru: "рано", ja: "早い" },
+    "late":    { he: "מְאֻחָר", es: "tarde", fr: "tard", de: "spät", ru: "поздно", ja: "遅い" },
+    "now":     { he: "עַכְשָׁו", es: "ahora", fr: "maintenant", de: "jetzt", ru: "сейчас", ja: "今" },
+    "here":    { he: "כָּאן", es: "aquí", fr: "ici", de: "hier", ru: "здесь", ja: "ここ" },
+    "there":   { he: "שָׁם", es: "allí", fr: "là", de: "dort", ru: "там", ja: "そこ" },
+    "where":   { he: "אֵיפֹה", es: "dónde", fr: "où", de: "wo", ru: "где", ja: "どこ" },
+    "when":    { he: "מָתַי", es: "cuándo", fr: "quand", de: "wann", ru: "когда", ja: "いつ" },
+    "why":     { he: "לָמָּה", es: "por qué", fr: "pourquoi", de: "warum", ru: "почему", ja: "なぜ" },
+    "how":     { he: "אֵיךְ", es: "cómo", fr: "comment", de: "wie", ru: "как", ja: "どう" },
+    "who":     { he: "מִי", es: "quién", fr: "qui", de: "wer", ru: "кто", ja: "誰" },
+    "what":    { he: "מָה", es: "qué", fr: "quoi", de: "was", ru: "что", ja: "何" }
+  },
+
+  4: {
+    // Level 4: Upper intermediate — abstract concepts, more complex vocab (~100 words)
+    "society": { he: "חֶבְרָה", es: "sociedad", fr: "société", de: "Gesellschaft", ru: "общество", ja: "社会" },
+    "culture": { he: "תַּרְבּוּת", es: "cultura", fr: "culture", de: "Kultur", ru: "культура", ja: "文化" },
+    "history": { he: "הִיסְטוֹרְיָה", es: "historia", fr: "histoire", de: "Geschichte", ru: "история", ja: "歴史" },
+    "science": { he: "מַדָּע", es: "ciencia", fr: "science", de: "Wissenschaft", ru: "наука", ja: "科学" },
+    "research":{ he: "מֶחְקָר", es: "investigación", fr: "recherche", de: "Forschung", ru: "исследование", ja: "研究" },
+    "experiment":{ he: "נִסּוּי", es: "experimento", fr: "expérience", de: "Experiment", ru: "эксперимент", ja: "実験" },
+    "theory":  { he: "תֵּאוֹרְיָה", es: "teoría", fr: "théorie", de: "Theorie", ru: "теория", ja: "理論" },
+    "evidence":{ he: "רְאָיָה", es: "evidencia", fr: "preuve", de: "Beweis", ru: "доказательство", ja: "証拠" },
+    "knowledge":{ he: "יֶדַע", es: "conocimiento", fr: "savoir", de: "Wissen", ru: "знание", ja: "知識" },
+    "wisdom":  { he: "חָכְמָה", es: "sabiduría", fr: "sagesse", de: "Weisheit", ru: "мудрость", ja: "知恵" },
+    "opinion": { he: "דֵּעָה", es: "opinión", fr: "opinion", de: "Meinung", ru: "мнение", ja: "意見" },
+    "decision":{ he: "הַחְלָטָה", es: "decisión", fr: "décision", de: "Entscheidung", ru: "решение", ja: "決定" },
+    "choice":  { he: "בְּחִירָה", es: "elección", fr: "choix", de: "Wahl", ru: "выбор", ja: "選択" },
+    "reason":  { he: "סִבָּה", es: "razón", fr: "raison", de: "Grund", ru: "причина", ja: "理由" },
+    "result":  { he: "תּוֹצָאָה", es: "resultado", fr: "résultat", de: "Ergebnis", ru: "результат", ja: "結果" },
+    "problem": { he: "בְּעָיָה", es: "problema", fr: "problème", de: "Problem", ru: "проблема", ja: "問題" },
+    "solution":{ he: "פִּתְרוֹן", es: "solución", fr: "solution", de: "Lösung", ru: "решение", ja: "解決" },
+    "purpose": { he: "מַטָּרָה", es: "propósito", fr: "but", de: "Zweck", ru: "цель", ja: "目的" },
+    "goal":    { he: "מַטָּרָה", es: "meta", fr: "objectif", de: "Ziel", ru: "цель", ja: "目標" },
+    "plan":    { he: "תָּכְנִית", es: "plan", fr: "plan", de: "Plan", ru: "план", ja: "計画" },
+    "method":  { he: "שִׁיטָה", es: "método", fr: "méthode", de: "Methode", ru: "метод", ja: "方法" },
+    "process": { he: "תַּהֲלִיךְ", es: "proceso", fr: "processus", de: "Prozess", ru: "процесс", ja: "過程" },
+    "system":  { he: "מַעֲרֶכֶת", es: "sistema", fr: "système", de: "System", ru: "система", ja: "システム" },
+    "structure":{ he: "מִבְנֶה", es: "estructura", fr: "structure", de: "Struktur", ru: "структура", ja: "構造" },
+    "function":{ he: "פִּקּוּד", es: "función", fr: "fonction", de: "Funktion", ru: "функция", ja: "機能" },
+    "develop": { he: "לְפַתֵּחַ", es: "desarrollar", fr: "développer", de: "entwickeln", ru: "развивать", ja: "発展する" },
+    "improve": { he: "לְשַׁפֵּר", es: "mejorar", fr: "améliorer", de: "verbessern", ru: "улучшать", ja: "改善する" },
+    "achieve": { he: "לְהַשִּׂיג", es: "lograr", fr: "atteindre", de: "erreichen", ru: "достигать", ja: "達成する" },
+    "succeed": { he: "לְהַצְלִיחַ", es: "tener éxito", fr: "réussir", de: "gelingen", ru: "преуспевать", ja: "成功する" },
+    "fail":    { he: "לְהִכָּשֵׁל", es: "fracasar", fr: "échouer", de: "scheitern", ru: "проваливаться", ja: "失敗する" },
+    "create":  { he: "לִיצֹר", es: "crear", fr: "créer", de: "erschaffen", ru: "создавать", ja: "創造する" },
+    "destroy": { he: "לְהָרֹס", es: "destruir", fr: "détruire", de: "zerstören", ru: "разрушать", ja: "破壊する" },
+    "build":   { he: "לִבְנוֹת", es: "construir", fr: "construire", de: "bauen", ru: "строить", ja: "建てる" },
+    "design":  { he: "לְעַצֵּב", es: "diseñar", fr: "concevoir", de: "entwerfen", ru: "проектировать", ja: "設計する" },
+    "discover":{ he: "לְגַלּוֹת", es: "descubrir", fr: "découvrir", de: "entdecken", ru: "открывать", ja: "発見する" },
+    "invent":  { he: "לְהַמְצִיא", es: "inventar", fr: "inventer", de: "erfinden", ru: "изобретать", ja: "発明する" },
+    "research (verb)":{ he: "לַחְקֹר", es: "investigar", fr: "rechercher", de: "forschen", ru: "исследовать", ja: "研究する" },
+    "study":   { he: "לִלְמֹד", es: "estudiar", fr: "étudier", de: "studieren", ru: "учиться", ja: "勉強する" },
+    "teach":   { he: "לְלַמֵּד", es: "enseñar", fr: "enseigner", de: "lehren", ru: "учить", ja: "教える" },
+    "lead":    { he: "לְהוֹבִיל", es: "liderar", fr: "diriger", de: "führen", ru: "вести", ja: "導く" },
+    "manage":  { he: "לְנַהֵל", es: "gestionar", fr: "gérer", de: "verwalten", ru: "управлять", ja: "管理する" },
+    "organize":{ he: "לְאַרְגֵּן", es: "organizar", fr: "organiser", de: "organisieren", ru: "организовывать", ja: "整理する" },
+    "control": { he: "לִשְׁלֹט", es: "controlar", fr: "contrôler", de: "kontrollieren", ru: "контролировать", ja: "制御する" },
+    "protect": { he: "לְהָגֵן", es: "proteger", fr: "protéger", de: "schützen", ru: "защищать", ja: "守る" },
+    "attack":  { he: "לִתְקֹף", es: "atacar", fr: "attaquer", de: "angreifen", ru: "атаковать", ja: "攻撃する" },
+    "defend":  { he: "לְהָגֵן", es: "defender", fr: "défendre", de: "verteidigen", ru: "защищать", ja: "防御する" },
+    "support": { he: "לִתְמֹךְ", es: "apoyar", fr: "soutenir", de: "unterstützen", ru: "поддерживать", ja: "支える" },
+    "increase":{ he: "לְהַגְדִּיל", es: "aumentar", fr: "augmenter", de: "erhöhen", ru: "увеличивать", ja: "増やす" },
+    "decrease":{ he: "לְהַקְטִין", es: "disminuir", fr: "diminuer", de: "verringern", ru: "уменьшать", ja: "減らす" },
+    "change":  { he: "לְשַׁנּוֹת", es: "cambiar", fr: "changer", de: "ändern", ru: "менять", ja: "変える" },
+    "continue":{ he: "לְהַמְשִׁיךְ", es: "continuar", fr: "continuer", de: "fortsetzen", ru: "продолжать", ja: "続ける" },
+    "complete":{ he: "לְהַשְׁלִים", es: "completar", fr: "compléter", de: "vervollständigen", ru: "завершать", ja: "完成する" },
+    "consider":{ he: "לִשְׁקֹל", es: "considerar", fr: "considérer", de: "erwägen", ru: "рассматривать", ja: "考慮する" },
+    "compare": { he: "לְהַשְׁווֹת", es: "comparar", fr: "comparer", de: "vergleichen", ru: "сравнивать", ja: "比較する" },
+    "describe":{ he: "לְתָאֵר", es: "describir", fr: "décrire", de: "beschreiben", ru: "описывать", ja: "描写する" },
+    "imagine": { he: "לְדַמְיֵן", es: "imaginar", fr: "imaginer", de: "vorstellen", ru: "представлять", ja: "想像する" },
+    "believe": { he: "לְהַאֲמִין", es: "creer", fr: "croire", de: "glauben", ru: "верить", ja: "信じる" },
+    "trust":   { he: "לִבְטֹחַ", es: "confiar", fr: "faire confiance", de: "vertrauen", ru: "доверять", ja: "信頼する" },
+    "respect": { he: "לְכַבֵּד", es: "respetar", fr: "respecter", de: "respektieren", ru: "уважать", ja: "尊敬する" },
+    "agree":   { he: "לְהַסְכִּים", es: "estar de acuerdo", fr: "être d'accord", de: "zustimmen", ru: "соглашаться", ja: "同意する" },
+    "disagree":{ he: "לֹא לְהַסְכִּים", es: "no estar de acuerdo", fr: "ne pas être d'accord", de: "widersprechen", ru: "не соглашаться", ja: "反対する" },
+    "expect":  { he: "לְצַפּוֹת", es: "esperar", fr: "s'attendre", de: "erwarten", ru: "ожидать", ja: "期待する" },
+    "promise": { he: "לְהַבְטִיחַ", es: "prometer", fr: "promettre", de: "versprechen", ru: "обещать", ja: "約束する" },
+    "complain":{ he: "לְהִתְלוֹנֵן", es: "quejarse", fr: "se plaindre", de: "beschweren", ru: "жаловаться", ja: "文句を言う" },
+    "argue":   { he: "לְהִתְוַכֵּחַ", es: "discutir", fr: "discuter", de: "streiten", ru: "спорить", ja: "議論する" },
+    "discuss": { he: "לָדוּן", es: "discutir", fr: "discuter", de: "diskutieren", ru: "обсуждать", ja: "話し合う" },
+    "advice":  { he: "עֵצָה", es: "consejo", fr: "conseil", de: "Rat", ru: "совет", ja: "助言" },
+    "warning": { he: "אַזְהָרָה", es: "advertencia", fr: "avertissement", de: "Warnung", ru: "предупреждение", ja: "警告" },
+    "danger":  { he: "סַכָּנָה", es: "peligro", fr: "danger", de: "Gefahr", ru: "опасность", ja: "危険" },
+    "safety":  { he: "בְּטִיחוּת", es: "seguridad", fr: "sécurité", de: "Sicherheit", ru: "безопасность", ja: "安全" },
+    "freedom": { he: "חוֹפֶשׁ", es: "libertad", fr: "liberté", de: "Freiheit", ru: "свобода", ja: "自由" },
+    "justice": { he: "צֶדֶק", es: "justicia", fr: "justice", de: "Gerechtigkeit", ru: "справедливость", ja: "正義" },
+    "peace":   { he: "שָׁלוֹם", es: "paz", fr: "paix", de: "Frieden", ru: "мир", ja: "平和" },
+    "war":     { he: "מִלְחָמָה", es: "guerra", fr: "guerre", de: "Krieg", ru: "война", ja: "戦争" },
+    "law":     { he: "חֹק", es: "ley", fr: "loi", de: "Gesetz", ru: "закон", ja: "法律" },
+    "right (entitlement)":{ he: "זְכוּת", es: "derecho", fr: "droit", de: "Recht", ru: "право", ja: "権利" },
+    "duty":    { he: "חוֹבָה", es: "deber", fr: "devoir", de: "Pflicht", ru: "долг", ja: "義務" },
+    "government":{ he: "מֶמְשָׁלָה", es: "gobierno", fr: "gouvernement", de: "Regierung", ru: "правительство", ja: "政府" },
+    "election":{ he: "בְּחִירוֹת", es: "elección", fr: "élection", de: "Wahl", ru: "выборы", ja: "選挙" },
+    "leader":  { he: "מַנְהִיג", es: "líder", fr: "leader", de: "Anführer", ru: "лидер", ja: "リーダー" },
+    "citizen": { he: "אֶזְרָח", es: "ciudadano", fr: "citoyen", de: "Bürger", ru: "гражданин", ja: "市民" },
+    "economy": { he: "כַּלְכָּלָה", es: "economía", fr: "économie", de: "Wirtschaft", ru: "экономика", ja: "経済" },
+    "business":{ he: "עֵסֶק", es: "negocio", fr: "affaires", de: "Geschäft", ru: "бизнес", ja: "ビジネス" },
+    "industry":{ he: "תַּעֲשִׂיָּה", es: "industria", fr: "industrie", de: "Industrie", ru: "промышленность", ja: "産業" },
+    "market":  { he: "שׁוּק", es: "mercado", fr: "marché", de: "Markt", ru: "рынок", ja: "市場" },
+    "customer":{ he: "לָקוֹחַ", es: "cliente", fr: "client", de: "Kunde", ru: "клиент", ja: "顧客" },
+    "service": { he: "שֵׁרוּת", es: "servicio", fr: "service", de: "Service", ru: "услуга", ja: "サービス" },
+    "company": { he: "חֶבְרָה", es: "empresa", fr: "entreprise", de: "Firma", ru: "компания", ja: "会社" },
+    "salary":  { he: "מַשְׂכֹּרֶת", es: "salario", fr: "salaire", de: "Gehalt", ru: "зарплата", ja: "給料" },
+    "tax":     { he: "מַס", es: "impuesto", fr: "impôt", de: "Steuer", ru: "налог", ja: "税金" },
+    "price":   { he: "מְחִיר", es: "precio", fr: "prix", de: "Preis", ru: "цена", ja: "値段" },
+    "value":   { he: "עֵרֶךְ", es: "valor", fr: "valeur", de: "Wert", ru: "значение", ja: "価値" },
+    "quality": { he: "אֵיכוּת", es: "calidad", fr: "qualité", de: "Qualität", ru: "качество", ja: "品質" },
+    "quantity":{ he: "כַּמּוּת", es: "cantidad", fr: "quantité", de: "Menge", ru: "количество", ja: "量" },
+    "level":   { he: "רָמָה", es: "nivel", fr: "niveau", de: "Ebene", ru: "уровень", ja: "レベル" },
+    "type":    { he: "סוּג", es: "tipo", fr: "type", de: "Typ", ru: "тип", ja: "種類" },
+    "form":    { he: "צוּרָה", es: "forma", fr: "forme", de: "Form", ru: "форма", ja: "形" },
+    "shape":   { he: "צוּרָה", es: "forma", fr: "forme", de: "Form", ru: "форма", ja: "形" },
+    "size":    { he: "גֹּדֶל", es: "tamaño", fr: "taille", de: "Größe", ru: "размер", ja: "サイズ" },
+    "weight":  { he: "מִשְׁקָל", es: "peso", fr: "poids", de: "Gewicht", ru: "вес", ja: "重さ" }
+  },
+
+  5: {
+    // Level 5: Advanced/academic — abstract, formal, complex vocabulary (~100 words)
+    "phenomenon":{ he: "תּוֹפָעָה", es: "fenómeno", fr: "phénomène", de: "Phänomen", ru: "явление", ja: "現象" },
+    "hypothesis":{ he: "הַשְׁעָרָה", es: "hipótesis", fr: "hypothèse", de: "Hypothese", ru: "гипотеза", ja: "仮説" },
+    "analysis":{ he: "נִתּוּחַ", es: "análisis", fr: "analyse", de: "Analyse", ru: "анализ", ja: "分析" },
+    "synthesis":{ he: "סִינְתֵּזָה", es: "síntesis", fr: "synthèse", de: "Synthese", ru: "синтез", ja: "合成" },
+    "paradigm":{ he: "פָּרָדִיגְמָה", es: "paradigma", fr: "paradigme", de: "Paradigma", ru: "парадигма", ja: "パラダイム" },
+    "methodology":{ he: "מֵתוֹדוֹלוֹגְיָה", es: "metodología", fr: "méthodologie", de: "Methodologie", ru: "методология", ja: "方法論" },
+    "framework":{ he: "מִסְגֶּרֶת", es: "marco", fr: "cadre", de: "Rahmen", ru: "структура", ja: "枠組み" },
+    "hierarchy":{ he: "הִיֵּרַרְכְיָה", es: "jerarquía", fr: "hiérarchie", de: "Hierarchie", ru: "иерархия", ja: "階層" },
+    "ideology":{ he: "אִידֵאוֹלוֹגְיָה", es: "ideología", fr: "idéologie", de: "Ideologie", ru: "идеология", ja: "イデオロギー" },
+    "philosophy":{ he: "פִילוֹסוֹפְיָה", es: "filosofía", fr: "philosophie", de: "Philosophie", ru: "философия", ja: "哲学" },
+    "psychology":{ he: "פְּסִיכוֹלוֹגְיָה", es: "psicología", fr: "psychologie", de: "Psychologie", ru: "психология", ja: "心理学" },
+    "consciousness":{ he: "תּוֹדָעָה", es: "conciencia", fr: "conscience", de: "Bewusstsein", ru: "сознание", ja: "意識" },
+    "perception":{ he: "תְּפִיסָה", es: "percepción", fr: "perception", de: "Wahrnehmung", ru: "восприятие", ja: "知覚" },
+    "intuition":{ he: "אִינְטוּאִיצְיָה", es: "intuición", fr: "intuition", de: "Intuition", ru: "интуиция", ja: "直感" },
+    "abstract":{ he: "מֻפְשָׁט", es: "abstracto", fr: "abstrait", de: "abstrakt", ru: "абстрактный", ja: "抽象的" },
+    "concrete":{ he: "קוֹנְקְרֶטִי", es: "concreto", fr: "concret", de: "konkret", ru: "конкретный", ja: "具体的" },
+    "explicit":{ he: "מְפֹרָשׁ", es: "explícito", fr: "explicite", de: "explizit", ru: "явный", ja: "明示的" },
+    "implicit":{ he: "מֻבְלָע", es: "implícito", fr: "implicite", de: "implizit", ru: "неявный", ja: "暗黙的" },
+    "ambiguous":{ he: "דּוּ-מַשְׁמָעִי", es: "ambiguo", fr: "ambigu", de: "mehrdeutig", ru: "неоднозначный", ja: "曖昧" },
+    "coherent":{ he: "מְלֻכָּד", es: "coherente", fr: "cohérent", de: "kohärent", ru: "связный", ja: "首尾一貫" },
+    "consistent":{ he: "עִקְבִי", es: "consistente", fr: "cohérent", de: "konsistent", ru: "последовательный", ja: "一貫" },
+    "comprehensive":{ he: "מָקִיף", es: "completo", fr: "complet", de: "umfassend", ru: "всеобъемлющий", ja: "包括的" },
+    "fundamental":{ he: "יְסוֹדִי", es: "fundamental", fr: "fondamental", de: "grundlegend", ru: "фундаментальный", ja: "基本的" },
+    "essential":{ he: "חִיּוּנִי", es: "esencial", fr: "essentiel", de: "wesentlich", ru: "существенный", ja: "本質的" },
+    "significant":{ he: "מַשְׁמָעוּתִי", es: "significativo", fr: "significatif", de: "bedeutend", ru: "значительный", ja: "重要" },
+    "relevant":{ he: "רֶלֵוַנְטִי", es: "relevante", fr: "pertinent", de: "relevant", ru: "уместный", ja: "関連" },
+    "objective":{ he: "אוֹבְּיֶקְטִיבִי", es: "objetivo", fr: "objectif", de: "objektiv", ru: "объективный", ja: "客観的" },
+    "subjective":{ he: "סוּבְּיֶקְטִיבִי", es: "subjetivo", fr: "subjectif", de: "subjektiv", ru: "субъективный", ja: "主観的" },
+    "empirical":{ he: "אֶמְפִּירִי", es: "empírico", fr: "empirique", de: "empirisch", ru: "эмпирический", ja: "実証的" },
+    "rational":{ he: "רַצְיוֹנָלִי", es: "racional", fr: "rationnel", de: "rational", ru: "рациональный", ja: "合理的" },
+    "logical": { he: "לוֹגִי", es: "lógico", fr: "logique", de: "logisch", ru: "логичный", ja: "論理的" },
+    "valid":   { he: "תָּקֵף", es: "válido", fr: "valide", de: "gültig", ru: "действительный", ja: "有効" },
+    "negotiate":{ he: "לְנַהֵל מַשָּׂא וּמַתָּן", es: "negociar", fr: "négocier", de: "verhandeln", ru: "вести переговоры", ja: "交渉する" },
+    "facilitate":{ he: "לְהָקֵל", es: "facilitar", fr: "faciliter", de: "erleichtern", ru: "облегчать", ja: "促進する" },
+    "demonstrate":{ he: "לְהַדְגִּים", es: "demostrar", fr: "démontrer", de: "demonstrieren", ru: "демонстрировать", ja: "実証する" },
+    "implement":{ he: "לְיַשֵּׂם", es: "implementar", fr: "mettre en œuvre", de: "umsetzen", ru: "осуществлять", ja: "実装する" },
+    "evaluate":{ he: "לְהַעֲרִיךְ", es: "evaluar", fr: "évaluer", de: "bewerten", ru: "оценивать", ja: "評価する" },
+    "interpret":{ he: "לְפָרֵשׁ", es: "interpretar", fr: "interpréter", de: "interpretieren", ru: "интерпретировать", ja: "解釈する" },
+    "establish":{ he: "לִכְלֹל", es: "establecer", fr: "établir", de: "etablieren", ru: "устанавливать", ja: "確立する" },
+    "indicate":{ he: "לְצַיֵּן", es: "indicar", fr: "indiquer", de: "anzeigen", ru: "указывать", ja: "示す" },
+    "emphasize":{ he: "לְהַדְגִּישׁ", es: "enfatizar", fr: "souligner", de: "betonen", ru: "подчёркивать", ja: "強調する" },
+    "acknowledge":{ he: "לְהַכִּיר", es: "reconocer", fr: "reconnaître", de: "anerkennen", ru: "признавать", ja: "認める" },
+    "contradict":{ he: "לִסְתֹּר", es: "contradecir", fr: "contredire", de: "widersprechen", ru: "противоречить", ja: "矛盾する" },
+    "distinguish":{ he: "לְהַבְחִין", es: "distinguir", fr: "distinguer", de: "unterscheiden", ru: "различать", ja: "区別する" },
+    "perceive":{ he: "לִתְפֹּס", es: "percibir", fr: "percevoir", de: "wahrnehmen", ru: "воспринимать", ja: "知覚する" },
+    "anticipate":{ he: "לְצַפּוֹת", es: "anticipar", fr: "anticiper", de: "vorhersehen", ru: "предвидеть", ja: "予想する" },
+    "speculate":{ he: "לְשַׁעֵר", es: "especular", fr: "spéculer", de: "spekulieren", ru: "размышлять", ja: "推測する" },
+    "scrutinize":{ he: "לִבְחֹן בִּקְפִידָה", es: "escudriñar", fr: "scruter", de: "prüfen", ru: "тщательно изучать", ja: "精査する" },
+    "elaborate":{ he: "לְפָרֵט", es: "elaborar", fr: "élaborer", de: "ausarbeiten", ru: "разрабатывать", ja: "詳述する" },
+    "infer":   { he: "לְהַסִּיק", es: "inferir", fr: "déduire", de: "schließen", ru: "выводить", ja: "推論する" },
+    "deduce":  { he: "לְהַסִּיק", es: "deducir", fr: "déduire", de: "ableiten", ru: "выводить", ja: "演繹する" },
+    "justify": { he: "לְהַצְדִּיק", es: "justificar", fr: "justifier", de: "rechtfertigen", ru: "оправдывать", ja: "正当化する" },
+    "criticize":{ he: "לְבַקֵּר", es: "criticar", fr: "critiquer", de: "kritisieren", ru: "критиковать", ja: "批判する" },
+    "controversy":{ he: "מַחֲלֹקֶת", es: "controversia", fr: "controverse", de: "Kontroverse", ru: "спор", ja: "論争" },
+    "consequence":{ he: "תּוֹצָאָה", es: "consecuencia", fr: "conséquence", de: "Folge", ru: "последствие", ja: "結果" },
+    "implication":{ he: "מַשְׁמָעוּת", es: "implicación", fr: "implication", de: "Implikation", ru: "значение", ja: "含意" },
+    "assumption":{ he: "הֲנָחָה", es: "suposición", fr: "supposition", de: "Annahme", ru: "предположение", ja: "仮定" },
+    "perspective":{ he: "פֶּרְסְפֶּקְטִיבָה", es: "perspectiva", fr: "perspective", de: "Perspektive", ru: "перспектива", ja: "視点" },
+    "context": { he: "הֶקְשֵׁר", es: "contexto", fr: "contexte", de: "Kontext", ru: "контекст", ja: "文脈" },
+    "scope":   { he: "טְוָח", es: "alcance", fr: "portée", de: "Umfang", ru: "охват", ja: "範囲" },
+    "extent":  { he: "מִדָּה", es: "extensión", fr: "étendue", de: "Ausmaß", ru: "степень", ja: "程度" },
+    "essence": { he: "מַהוּת", es: "esencia", fr: "essence", de: "Wesen", ru: "сущность", ja: "本質" },
+    "diversity":{ he: "גִּוּוּן", es: "diversidad", fr: "diversité", de: "Vielfalt", ru: "разнообразие", ja: "多様性" },
+    "uniformity":{ he: "אֲחִידוּת", es: "uniformidad", fr: "uniformité", de: "Einheitlichkeit", ru: "единообразие", ja: "均一性" },
+    "phenomena":{ he: "תּוֹפָעוֹת", es: "fenómenos", fr: "phénomènes", de: "Phänomene", ru: "явления", ja: "現象" },
+    "doctrine":{ he: "דּוֹקְטְרִינָה", es: "doctrina", fr: "doctrine", de: "Doktrin", ru: "доктрина", ja: "教義" },
+    "ethics":  { he: "אֶתִיקָה", es: "ética", fr: "éthique", de: "Ethik", ru: "этика", ja: "倫理" },
+    "morality":{ he: "מוּסָר", es: "moralidad", fr: "moralité", de: "Moral", ru: "мораль", ja: "道徳" },
+    "virtue":  { he: "מַעֲלָה", es: "virtud", fr: "vertu", de: "Tugend", ru: "добродетель", ja: "美徳" },
+    "integrity":{ he: "יֹשֶׁר", es: "integridad", fr: "intégrité", de: "Integrität", ru: "честность", ja: "誠実" },
+    "autonomy":{ he: "אוֹטוֹנוֹמְיָה", es: "autonomía", fr: "autonomie", de: "Autonomie", ru: "автономия", ja: "自律" },
+    "sovereignty":{ he: "רִבּוֹנוּת", es: "soberanía", fr: "souveraineté", de: "Souveränität", ru: "суверенитет", ja: "主権" },
+    "democracy":{ he: "דֶּמוֹקְרַטְיָה", es: "democracia", fr: "démocratie", de: "Demokratie", ru: "демократия", ja: "民主主義" },
+    "constitution":{ he: "חֻקָּה", es: "constitución", fr: "constitution", de: "Verfassung", ru: "конституция", ja: "憲法" },
+    "legislation":{ he: "חֲקִיקָה", es: "legislación", fr: "législation", de: "Gesetzgebung", ru: "законодательство", ja: "立法" },
+    "judiciary":{ he: "מַעֲרֶכֶת הַמִּשְׁפָּט", es: "judicial", fr: "judiciaire", de: "Justiz", ru: "судебная власть", ja: "司法" },
+    "diplomacy":{ he: "דִּיפְּלוֹמַטְיָה", es: "diplomacia", fr: "diplomatie", de: "Diplomatie", ru: "дипломатия", ja: "外交" },
+    "alliance":{ he: "בְּרִית", es: "alianza", fr: "alliance", de: "Bündnis", ru: "союз", ja: "同盟" },
+    "treaty":  { he: "אֲמָנָה", es: "tratado", fr: "traité", de: "Vertrag", ru: "договор", ja: "条約" },
+    "negotiation":{ he: "מַשָּׂא וּמַתָּן", es: "negociación", fr: "négociation", de: "Verhandlung", ru: "переговоры", ja: "交渉" },
+    "infrastructure":{ he: "תַּשְׁתִּית", es: "infraestructura", fr: "infrastructure", de: "Infrastruktur", ru: "инфраструктура", ja: "インフラ" },
+    "sustainability":{ he: "קַיָּמוּת", es: "sostenibilidad", fr: "durabilité", de: "Nachhaltigkeit", ru: "устойчивость", ja: "持続可能性" },
+    "innovation":{ he: "חַדְשָׁנוּת", es: "innovación", fr: "innovation", de: "Innovation", ru: "инновация", ja: "革新" },
+    "technology":{ he: "טֶכְנוֹלוֹגְיָה", es: "tecnología", fr: "technologie", de: "Technologie", ru: "технология", ja: "技術" },
+    "globalization":{ he: "גְּלוֹבָּלִיזַצְיָה", es: "globalización", fr: "mondialisation", de: "Globalisierung", ru: "глобализация", ja: "グローバル化" },
+    "urbanization":{ he: "עִרְבּוּן", es: "urbanización", fr: "urbanisation", de: "Urbanisierung", ru: "урбанизация", ja: "都市化" },
+    "demographic":{ he: "דֶּמוֹגְרָפִי", es: "demográfico", fr: "démographique", de: "demografisch", ru: "демографический", ja: "人口統計" },
+    "statistics":{ he: "סְטָטִיסְטִיקָה", es: "estadística", fr: "statistique", de: "Statistik", ru: "статистика", ja: "統計" },
+    "correlation":{ he: "מִתְאָם", es: "correlación", fr: "corrélation", de: "Korrelation", ru: "корреляция", ja: "相関" },
+    "causation":{ he: "סִבָּתִיּוּת", es: "causalidad", fr: "causalité", de: "Kausalität", ru: "причинность", ja: "因果" },
+    "variable":{ he: "מִשְׁתַּנֶּה", es: "variable", fr: "variable", de: "Variable", ru: "переменная", ja: "変数" },
+    "criterion":{ he: "קְרִיטֶרְיוֹן", es: "criterio", fr: "critère", de: "Kriterium", ru: "критерий", ja: "基準" },
+    "premise": { he: "הַנָּחָה", es: "premisa", fr: "prémisse", de: "Prämisse", ru: "предпосылка", ja: "前提" },
+    "conclusion":{ he: "מַסְקָנָה", es: "conclusión", fr: "conclusion", de: "Schlussfolgerung", ru: "вывод", ja: "結論" },
+    "preliminary":{ he: "מַקְדִּים", es: "preliminar", fr: "préliminaire", de: "vorläufig", ru: "предварительный", ja: "予備的" },
+    "subsequent":{ he: "עוֹקֵב", es: "subsiguiente", fr: "ultérieur", de: "nachfolgend", ru: "последующий", ja: "後続" },
+    "simultaneous":{ he: "סִימוּלְטָנִי", es: "simultáneo", fr: "simultané", de: "gleichzeitig", ru: "одновременный", ja: "同時" },
+    "inherent":{ he: "טָמוּן", es: "inherente", fr: "inhérent", de: "inhärent", ru: "присущий", ja: "固有" },
+    "intrinsic":{ he: "פְּנִימִי", es: "intrínseco", fr: "intrinsèque", de: "intrinsisch", ru: "внутренний", ja: "本質的" },
+    "extrinsic":{ he: "חִיצוֹנִי", es: "extrínseco", fr: "extrinsèque", de: "extrinsisch", ru: "внешний", ja: "外的" },
+    "prevalent":{ he: "נָפוֹץ", es: "prevaleciente", fr: "répandu", de: "vorherrschend", ru: "распространённый", ja: "広まった" },
+    "obsolete":{ he: "מְיֻשָּׁן", es: "obsoleto", fr: "obsolète", de: "veraltet", ru: "устаревший", ja: "時代遅れ" },
+    "preliminary (noun)":{ he: "מַקְדָּם", es: "preliminar", fr: "préliminaire", de: "Vorbereitung", ru: "предварительный", ja: "予備" }
+  }
+};
+
+const LANGUAGES = {
+  he: { name: "Hebrew", flag: "🇮🇱", dir: "rtl", speak: "he-IL" },
+  es: { name: "Spanish", flag: "🇪🇸", dir: "ltr", speak: "es-ES" },
+  fr: { name: "French", flag: "🇫🇷", dir: "ltr", speak: "fr-FR" },
+  de: { name: "German", flag: "🇩🇪", dir: "ltr", speak: "de-DE" },
+  ru: { name: "Russian", flag: "🇷🇺", dir: "ltr", speak: "ru-RU" },
+  ja: { name: "Japanese", flag: "🇯🇵", dir: "ltr", speak: "ja-JP" }
+};
+
+
+  // ===== Praise/encouragement strings =====
+  var PRAISE = ['Awesome!','Great job!','Nice!','Got it!','Perfect!','Brilliant!','Yes!','Superb!'];
+  var ENCOURAGE = ['Almost!','Try again!','Keep going!','You can do it!'];
+
+  // ===== App state =====
+  var currentLang = null;        // 'he', 'es', etc.
+  var currentMode = null;        // 'level', 'custom', 'photo'
+  var currentLevel = null;       // 1-5
+  var sessionWords = [];         // current game's word list [{en, tr}, ...]
+  var customWords = [];          // user's custom word list
+  var wordStats = {};            // per-word stats (mastery)
+  var questionQueue = [];
+  var recentWords = [];
+
+  var state = { current: null, answered: false, wrongOnThisAttempt: false, score: 0, streak: 0 };
+
+  // ===== Load state from localStorage =====
+  try { var savedCustom = localStorage.getItem('wq_custom_v3'); if (savedCustom) customWords = JSON.parse(savedCustom); } catch(e) {}
+  try { var savedLang = localStorage.getItem('wq_lang_v3'); if (savedLang) currentLang = savedLang; } catch(e) {}
+
+  function saveCustom() {
+    try { localStorage.setItem('wq_custom_v3', JSON.stringify(customWords)); } catch(e) {}
+  }
+  function saveLang() {
+    try { localStorage.setItem('wq_lang_v3', currentLang); } catch(e) {}
+  }
+
+  // Per-session mastery key depends on mode+lang+level
+  function getStatsKey() {
+    if (currentMode === 'level') return 'wq_stats_level_' + currentLang + '_' + currentLevel;
+    if (currentMode === 'custom') return 'wq_stats_custom_' + currentLang;
+    if (currentMode === 'photo') return 'wq_stats_photo_' + currentLang;
+    return null;
+  }
+  function loadStats() {
+    var key = getStatsKey();
+    wordStats = {};
+    if (!key) return;
+    try { var raw = localStorage.getItem(key); if (raw) wordStats = JSON.parse(raw); } catch(e) {}
+  }
+  function saveStats() {
+    var key = getStatsKey();
+    if (!key) return;
+    try { localStorage.setItem(key, JSON.stringify(wordStats)); } catch(e) {}
+  }
+
+  // ===== Word utilities =====
+  function getStat(en) {
+    if (!wordStats[en]) wordStats[en] = { attempts: 0, wrongCount: 0, mastered: false };
+    return wordStats[en];
+  }
+  function masteredCount() {
+    var n = 0;
+    for (var i = 0; i < sessionWords.length; i++) {
+      var s = wordStats[sessionWords[i].en];
+      if (s && s.mastered) n++;
+    }
+    return n;
+  }
+  function shuffle(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function pickRandomDistractors(correct, n) {
+    var pool = [];
+    for (var i = 0; i < sessionWords.length; i++) {
+      if (sessionWords[i].tr !== correct.tr) pool.push(sessionWords[i]);
+    }
+    // If not enough words in session, fall back to filling with same-language entries from any level
+    if (pool.length < n && currentLang && DICTIONARY) {
+      for (var L = 1; L <= 5; L++) {
+        var levelDict = DICTIONARY[L];
+        for (var en in levelDict) {
+          var tr = levelDict[en][currentLang];
+          if (tr && tr !== correct.tr) {
+            var exists = false;
+            for (var k = 0; k < pool.length; k++) { if (pool[k].tr === tr) { exists = true; break; } }
+            if (!exists) pool.push({ en: en, tr: tr });
+          }
+        }
+      }
+    }
+    return shuffle(pool).slice(0, n);
+  }
+  function buildInitialQueue() {
+    var unmastered = [], mastered = [];
+    for (var i = 0; i < sessionWords.length; i++) {
+      var s = wordStats[sessionWords[i].en];
+      if (s && s.mastered) mastered.push(sessionWords[i]);
+      else unmastered.push(sessionWords[i]);
+    }
+    questionQueue = shuffle(unmastered).concat(shuffle(mastered));
+  }
+  function getNextWord() {
+    if (questionQueue.length === 0) buildInitialQueue();
+    var next = questionQueue.shift();
+    if (recentWords.length > 0 && next.en === recentWords[recentWords.length - 1] && questionQueue.length > 0) {
+      var alt = questionQueue.shift();
+      questionQueue.push(next);
+      next = alt;
+    }
+    recentWords.push(next.en);
+    if (recentWords.length > 3) recentWords.shift();
+    return next;
+  }
+  function reinforceWord(word) {
+    var pos1 = Math.min(questionQueue.length, 2 + Math.floor(Math.random() * 4));
+    var pos2 = Math.min(questionQueue.length, 5 + Math.floor(Math.random() * 5));
+    questionQueue.splice(pos1, 0, word);
+    questionQueue.splice(pos2, 0, word);
+  }
+
+  // ===== Audio =====
+  var audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; } }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  function playNote(freq, startTime, duration, type, gain) {
+    var ctx = getAudioCtx(); if (!ctx) return;
+    var osc = ctx.createOscillator();
+    var g = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, startTime);
+    g.gain.setValueAtTime(0, startTime);
+    g.gain.linearRampToValueAtTime(gain || 0.2, startTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(startTime); osc.stop(startTime + duration);
+  }
+  function playCorrectSound() {
+    var ctx = getAudioCtx(); if (!ctx) return; var now = ctx.currentTime;
+    playNote(523.25, now, 0.15, 'triangle', 0.25);
+    playNote(659.25, now + 0.10, 0.15, 'triangle', 0.25);
+    playNote(783.99, now + 0.20, 0.15, 'triangle', 0.25);
+    playNote(1046.5, now + 0.30, 0.30, 'triangle', 0.30);
+    playNote(1568.0, now + 0.32, 0.20, 'sine', 0.10);
+  }
+  function playWrongSound() {
+    var ctx = getAudioCtx(); if (!ctx) return; var now = ctx.currentTime;
+    playNote(329.63, now, 0.18, 'sine', 0.22);
+    playNote(311.13, now + 0.16, 0.18, 'sine', 0.22);
+    playNote(293.66, now + 0.32, 0.18, 'sine', 0.22);
+    playNote(277.18, now + 0.48, 0.45, 'sine', 0.22);
+  }
+  function playMasterySound() {
+    var ctx = getAudioCtx(); if (!ctx) return; var now = ctx.currentTime;
+    playNote(523.25, now, 0.20, 'triangle', 0.30);
+    playNote(659.25, now + 0.15, 0.20, 'triangle', 0.30);
+    playNote(783.99, now + 0.30, 0.20, 'triangle', 0.30);
+    playNote(1046.5, now + 0.45, 0.40, 'triangle', 0.35);
+    playNote(1318.5, now + 0.55, 0.50, 'triangle', 0.30);
+  }
+
+  // ===== Speech =====
+  var voices = [];
+  function loadVoices() { voices = window.speechSynthesis ? window.speechSynthesis.getVoices() : []; }
+  if (window.speechSynthesis) {
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  function speak(text) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    var utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'en-US';
+    utter.rate = 0.85;
+    utter.pitch = 1.05;
+    var enVoice = null;
+    for (var i = 0; i < voices.length; i++) {
+      if (voices[i].lang && voices[i].lang.indexOf('en') === 0) { enVoice = voices[i]; break; }
+    }
+    if (enVoice) utter.voice = enVoice;
+    speakBtn.classList.add('speaking');
+    utter.onend = function() { speakBtn.classList.remove('speaking'); };
+    utter.onerror = function() { speakBtn.classList.remove('speaking'); };
+    window.speechSynthesis.speak(utter);
+  }
+
+  // ===== Elements =====
+  var wordEl = document.getElementById('word');
+  var speakBtn = document.getElementById('speakBtn');
+  var optionsEl = document.getElementById('options');
+  var feedbackEl = document.getElementById('feedback');
+  var feedbackEmoji = document.getElementById('feedbackEmoji');
+  var feedbackText = document.getElementById('feedbackText');
+  var nextBtn = document.getElementById('nextBtn');
+  var scoreEl = document.getElementById('score');
+  var streakEl = document.getElementById('streak');
+  var masteredEl = document.getElementById('mastered');
+  var totalEl = document.getElementById('total');
+  var progressBar = document.getElementById('progressBar');
+  var progressLabel = document.getElementById('progressLabel');
+  var topStats = document.getElementById('topStats');
+  var homeBtn = document.getElementById('homeBtn');
+  var logoBtn = document.getElementById('logoBtn');
+
+  var homeScreen = document.getElementById('homeScreen');
+  var langScreen = document.getElementById('langScreen');
+  var levelScreen = document.getElementById('levelScreen');
+  var photoScreen = document.getElementById('photoScreen');
+  var customScreen = document.getElementById('customScreen');
+  var gameScreen = document.getElementById('gameScreen');
+  var allDone = document.getElementById('allDone');
+
+  // ===== Screen management =====
+  var ALL_SCREENS = [homeScreen, langScreen, levelScreen, photoScreen, customScreen, gameScreen, allDone];
+  function showScreen(screen) {
+    for (var i = 0; i < ALL_SCREENS.length; i++) ALL_SCREENS[i].classList.add('hide');
+    if (screen === allDone) { allDone.classList.remove('hide'); allDone.classList.add('show'); }
+    else { allDone.classList.remove('show'); screen.classList.remove('hide'); }
+    // Hide game stats unless on game/all-done screen
+    if (screen === gameScreen || screen === allDone) topStats.style.display = 'flex';
+    else topStats.style.display = 'none';
+  }
+
+  // ===== Home button handlers =====
+  homeBtn.addEventListener('click', goHome);
+  logoBtn.addEventListener('click', goHome);
+  function goHome() {
+    showScreen(homeScreen);
+    currentMode = null;
+    currentLevel = null;
+  }
+
+  // ===== Mode selection =====
+  document.getElementById('modeLevel').addEventListener('click', function() {
+    currentMode = 'level';
+    buildLangGrid('level');
+    showScreen(langScreen);
+  });
+  document.getElementById('modePhoto').addEventListener('click', function() {
+    currentMode = 'photo';
+    buildLangGrid('photo');
+    showScreen(langScreen);
+  });
+  document.getElementById('modeCustom').addEventListener('click', function() {
+    currentMode = 'custom';
+    buildLangGrid('custom');
+    showScreen(langScreen);
+  });
+
+  // ===== Language picker =====
+  function buildLangGrid(nextMode) {
+    var grid = document.getElementById('langGrid');
+    grid.innerHTML = '';
+    for (var code in LANGUAGES) {
+      (function(code, info) {
+        var btn = document.createElement('button');
+        btn.className = 'lang-btn';
+        btn.innerHTML = '<span class="flag">' + info.flag + '</span><span>' + info.name + '</span>';
+        btn.addEventListener('click', function() {
+          currentLang = code;
+          saveLang();
+          if (currentMode === 'level') {
+            buildLevelGrid();
+            showScreen(levelScreen);
+          } else if (currentMode === 'photo') {
+            showScreen(photoScreen);
+            resetPhotoScreen();
+          } else if (currentMode === 'custom') {
+            loadCustomEditor();
+            showScreen(customScreen);
+          }
+        });
+        grid.appendChild(btn);
+      })(code, LANGUAGES[code]);
+    }
+  }
+
+  // ===== Level picker =====
+  var LEVEL_INFO = [
+    null,
+    { title: 'Level 1 — First Words', desc: 'Animals, family, colors, numbers' },
+    { title: 'Level 2 — Early Reader', desc: 'Common nouns, verbs, adjectives' },
+    { title: 'Level 3 — Intermediate', desc: 'Daily life, emotions, more verbs' },
+    { title: 'Level 4 — Upper Intermediate', desc: 'Abstract concepts, society' },
+    { title: 'Level 5 — Advanced', desc: 'Academic & formal vocabulary' }
+  ];
+  function buildLevelGrid() {
+    var grid = document.getElementById('levelGrid');
+    grid.innerHTML = '';
+    document.getElementById('levelSubtitle').textContent = 'In ' + LANGUAGES[currentLang].name + ' ' + LANGUAGES[currentLang].flag;
+    for (var i = 1; i <= 5; i++) {
+      (function(level) {
+        var btn = document.createElement('button');
+        btn.className = 'level-btn';
+        btn.setAttribute('data-level', level);
+        var info = LEVEL_INFO[level];
+        btn.innerHTML = '<span class="level-num">' + level + '</span>' +
+          '<div><div class="level-title">' + info.title + '</div>' +
+          '<div class="level-desc">' + info.desc + '</div></div>';
+        btn.addEventListener('click', function() {
+          currentLevel = level;
+          startLevelGame();
+        });
+        grid.appendChild(btn);
+      })(i);
+    }
+  }
+
+  function startLevelGame() {
+    // Build sessionWords from DICTIONARY[level][...][currentLang]
+    var levelDict = DICTIONARY[currentLevel];
+    sessionWords = [];
+    for (var en in levelDict) {
+      var tr = levelDict[en][currentLang];
+      if (tr) sessionWords.push({ en: en, tr: tr });
+    }
+    loadStats();
+    recentWords = [];
+    state.score = 0;
+    state.streak = 0;
+    buildInitialQueue();
+    showScreen(gameScreen);
+    updateStats();
+    updateProgress();
+    newQuestion();
+  }
+
+  // ===== Custom list editor =====
+  function loadCustomEditor() {
+    var custEn = document.getElementById('customEn');
+    var custTr = document.getElementById('customTr');
+    custTr.classList.toggle('he-input', LANGUAGES[currentLang].dir === 'rtl');
+    custTr.style.direction = LANGUAGES[currentLang].dir;
+    custTr.placeholder = 'Translation';
+    renderCustomList();
+  }
+  function renderCustomList() {
+    var listEl = document.getElementById('customList');
+    var count = document.getElementById('customCount');
+    var playBtn = document.getElementById('customPlay');
+    var filtered = customWords.filter(function(w) { return w.lang === currentLang; });
+    count.textContent = filtered.length;
+    playBtn.disabled = filtered.length < 5;
+    if (filtered.length === 0) {
+      listEl.innerHTML = '<div class="custom-empty">No words yet. Add at least 5 to play.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    for (var i = 0; i < customWords.length; i++) {
+      if (customWords[i].lang !== currentLang) continue;
+      (function(idx, word) {
+        var row = document.createElement('div');
+        row.className = 'custom-row';
+        var trClass = LANGUAGES[currentLang].dir === 'rtl' ? 'tr' : 'tr ltr';
+        row.innerHTML = '<span class="en">' + word.en + '</span>' +
+          '<span class="' + trClass + '">' + word.tr + '</span>' +
+          '<button class="del" data-idx="' + idx + '">×</button>';
+        row.querySelector('.del').addEventListener('click', function() {
+          customWords.splice(idx, 1);
+          saveCustom();
+          renderCustomList();
+        });
+        listEl.appendChild(row);
+      })(i, customWords[i]);
+    }
+  }
+  document.getElementById('customAdd').addEventListener('click', function() {
+    var en = document.getElementById('customEn').value.trim();
+    var tr = document.getElementById('customTr').value.trim();
+    if (!en || !tr) { alert('Please enter both English and translation'); return; }
+    customWords.push({ en: en, tr: tr, lang: currentLang });
+    saveCustom();
+    document.getElementById('customEn').value = '';
+    document.getElementById('customTr').value = '';
+    renderCustomList();
+    document.getElementById('customEn').focus();
+  });
+  document.getElementById('customClear').addEventListener('click', function() {
+    if (!confirm('Delete all custom words for this language?')) return;
+    customWords = customWords.filter(function(w) { return w.lang !== currentLang; });
+    saveCustom();
+    renderCustomList();
+  });
+  document.getElementById('customPlay').addEventListener('click', function() {
+    sessionWords = customWords.filter(function(w) { return w.lang === currentLang; }).map(function(w) {
+      return { en: w.en, tr: w.tr };
+    });
+    if (sessionWords.length < 5) { alert('Need at least 5 words to play'); return; }
+    loadStats();
+    recentWords = [];
+    state.score = 0;
+    state.streak = 0;
+    buildInitialQueue();
+    showScreen(gameScreen);
+    updateStats();
+    updateProgress();
+    newQuestion();
+  });
+
+  // ===== Photo OCR =====
+  function resetPhotoScreen() {
+    document.getElementById('photoPreview').innerHTML = '';
+    document.getElementById('photoStatus').className = 'photo-status';
+    document.getElementById('photoStatus').textContent = 'Ready when you are 👆';
+  }
+  document.getElementById('photoCamera').addEventListener('change', handlePhotoFile);
+  document.getElementById('photoUpload').addEventListener('change', handlePhotoFile);
+
+  function handlePhotoFile(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var preview = document.getElementById('photoPreview');
+    var status = document.getElementById('photoStatus');
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      preview.innerHTML = '<img src="' + ev.target.result + '" alt="Preview">';
+      status.className = 'photo-status loading';
+      status.textContent = '🔄 Loading OCR engine... (~3MB first time)';
+      runOCR(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function runOCR(imageData) {
+    var status = document.getElementById('photoStatus');
+    // Load Tesseract dynamically
+    if (typeof Tesseract === 'undefined') {
+      var script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      script.onload = function() { doOCR(imageData); };
+      script.onerror = function() {
+        status.className = 'photo-status error';
+        status.textContent = '❌ Could not load OCR. Check your internet connection.';
+      };
+      document.head.appendChild(script);
+    } else {
+      doOCR(imageData);
+    }
+  }
+
+  function doOCR(imageData) {
+    var status = document.getElementById('photoStatus');
+    status.textContent = '📖 Reading text from image...';
+    Tesseract.recognize(imageData, 'eng', {
+      logger: function(m) {
+        if (m.status === 'recognizing text') {
+          status.textContent = '📖 Reading... ' + Math.round(m.progress * 100) + '%';
+        }
+      }
+    }).then(function(result) {
+      var text = result.data.text;
+      var words = extractEnglishWords(text);
+      if (words.length === 0) {
+        status.className = 'photo-status error';
+        status.textContent = '❌ No words found. Try a clearer photo of printed text.';
+        return;
+      }
+      status.className = 'photo-status success';
+      status.textContent = '✅ Found ' + words.length + ' words. Translating to ' + LANGUAGES[currentLang].name + '...';
+      translateExtractedWords(words);
+    }).catch(function(err) {
+      status.className = 'photo-status error';
+      status.textContent = '❌ OCR failed: ' + err.message;
+    });
+  }
+
+  function extractEnglishWords(text) {
+    // Extract English words from OCR text
+    var lines = text.split(/[\n,;]+/);
+    var words = [];
+    var seen = {};
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      // Get English-letter sequences (1-3 words per entry)
+      var matches = line.match(/[a-zA-Z][a-zA-Z' -]{1,30}[a-zA-Z]/g);
+      if (matches) {
+        for (var j = 0; j < matches.length; j++) {
+          var w = matches[j].toLowerCase().trim();
+          if (w.length < 2) continue;
+          if (seen[w]) continue;
+          seen[w] = true;
+          words.push(w);
+        }
+      }
+    }
+    return words;
+  }
+
+  function translateExtractedWords(englishWords) {
+    var status = document.getElementById('photoStatus');
+    // Look up each word in the master dictionary across all levels
+    var found = [];
+    var notFound = [];
+    for (var i = 0; i < englishWords.length; i++) {
+      var en = englishWords[i];
+      var tr = null;
+      for (var L = 1; L <= 5; L++) {
+        if (DICTIONARY[L][en] && DICTIONARY[L][en][currentLang]) {
+          tr = DICTIONARY[L][en][currentLang];
+          break;
+        }
+      }
+      if (tr) found.push({ en: en, tr: tr });
+      else notFound.push(en);
+    }
+
+    if (found.length < 3) {
+      status.className = 'photo-status error';
+      status.textContent = '❌ Only found translations for ' + found.length + ' words. Try a different image or use "My Words" mode to add them manually.';
+      return;
+    }
+
+    status.className = 'photo-status success';
+    var msg = '✅ Got ' + found.length + ' translations';
+    if (notFound.length > 0) msg += ' (' + notFound.length + ' unknown skipped)';
+    status.textContent = msg + '. Starting game...';
+
+    // Save these as the session, also save to customWords so user can re-use
+    sessionWords = found;
+    loadStats();
+    recentWords = [];
+    state.score = 0;
+    state.streak = 0;
+    buildInitialQueue();
+
+    setTimeout(function() {
+      showScreen(gameScreen);
+      updateStats();
+      updateProgress();
+      newQuestion();
+    }, 1200);
+  }
+
+  // ===== Game logic =====
+  function updateProgress() {
+    var m = masteredCount();
+    var total = sessionWords.length;
+    masteredEl.textContent = m;
+    totalEl.textContent = total;
+    progressBar.style.width = (total > 0 ? (m / total * 100) : 0) + '%';
+    progressLabel.textContent = m + ' / ' + total + ' mastered';
+  }
+  function updateStats() {
+    scoreEl.textContent = state.score;
+    streakEl.textContent = state.streak;
+  }
+
+  function newQuestion() {
+    state.answered = false;
+    state.wrongOnThisAttempt = false;
+    feedbackEl.classList.remove('show', 'good', 'bad');
+    nextBtn.classList.remove('show');
+
+    if (sessionWords.length === 0) { goHome(); return; }
+    if (masteredCount() === sessionWords.length) { showAllDone(); return; }
+
+    var word = getNextWord();
+    state.current = word;
+    wordEl.textContent = word.en;
+
+    var distractors = pickRandomDistractors(word, 4);
+    var allOptions = shuffle([word].concat(distractors));
+
+    var isRTL = LANGUAGES[currentLang].dir === 'rtl';
+
+    optionsEl.innerHTML = '';
+    for (var i = 0; i < allOptions.length; i++) {
+      (function(opt, idx) {
+        var btn = document.createElement('button');
+        btn.className = 'option ' + (isRTL ? 'rtl' : 'ltr');
+        if (isRTL) {
+          btn.innerHTML = '<span class="option-text">' + opt.tr + '</span><span class="option-num">' + (idx + 1) + '</span>';
+        } else {
+          btn.innerHTML = '<span class="option-num">' + (idx + 1) + '</span><span class="option-text">' + opt.tr + '</span>';
+        }
+        btn.addEventListener('click', function() { handleAnswer(btn, opt, word); });
+        optionsEl.appendChild(btn);
+      })(allOptions[i], i);
+    }
+
+    updateProgress();
+    setTimeout(function() { speak(word.en); }, 250);
+  }
+
+  function handleAnswer(btn, chosen, correct) {
+    if (state.answered) return;
+    var allBtns = optionsEl.querySelectorAll('.option');
+
+    if (chosen.tr === correct.tr) {
+      state.answered = true;
+      for (var i = 0; i < allBtns.length; i++) allBtns[i].disabled = true;
+      btn.classList.add('correct');
+
+      var stat = getStat(correct.en);
+      stat.attempts++;
+
+      var newlyMastered = false;
+      if (!state.wrongOnThisAttempt) {
+        if (!stat.mastered) { stat.mastered = true; newlyMastered = true; }
+        state.score++;
+        state.streak++;
+      } else {
+        state.streak = 0;
+      }
+
+      saveStats();
+      updateStats();
+      updateProgress();
+
+      feedbackEl.classList.add('show', 'good');
+      if (newlyMastered) {
+        feedbackEmoji.textContent = '⭐';
+        feedbackText.textContent = 'Mastered! ' + correct.en + ' = ' + correct.tr;
+        playMasterySound();
+        fireConfetti(40);
+      } else {
+        feedbackEmoji.textContent = state.streak >= 5 ? '🔥' : (state.streak >= 3 ? '⭐' : '🎉');
+        feedbackText.textContent = PRAISE[Math.floor(Math.random() * PRAISE.length)];
+        playCorrectSound();
+        if (!state.wrongOnThisAttempt) fireConfetti(24);
+      }
+
+      nextBtn.classList.add('show');
+      if (masteredCount() === sessionWords.length) setTimeout(showAllDone, 1500);
+    } else {
+      btn.classList.add('wrong');
+      btn.disabled = true;
+      if (!state.wrongOnThisAttempt) {
+        state.wrongOnThisAttempt = true;
+        state.streak = 0;
+        var stat = getStat(correct.en);
+        stat.wrongCount++;
+        if (stat.mastered) stat.mastered = false;
+        saveStats();
+        reinforceWord(correct);
+        updateStats();
+        updateProgress();
+      }
+      feedbackEl.classList.add('show', 'bad');
+      feedbackEmoji.textContent = '💪';
+      feedbackText.textContent = ENCOURAGE[Math.floor(Math.random() * ENCOURAGE.length)];
+      playWrongSound();
+    }
+  }
+
+  function fireConfetti(count) {
+    var colors = ['#f59e0b', '#ec4899', '#14b8a6', '#8b5cf6', '#22c55e', '#3b82f6'];
+    var n = count || 24;
+    for (var i = 0; i < n; i++) {
+      var piece = document.createElement('div');
+      piece.className = 'confetti';
+      piece.style.left = (Math.random() * 100) + 'vw';
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+      piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+      document.body.appendChild(piece);
+      var duration = 1500 + Math.random() * 1500;
+      var drift = (Math.random() - 0.5) * 200;
+      piece.animate([
+        { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+        { transform: 'translate(' + drift + 'px, ' + (window.innerHeight + 40) + 'px) rotate(' + (Math.random() * 720) + 'deg)', opacity: 0 }
+      ], { duration: duration, easing: 'cubic-bezier(.5,.1,.5,1)' });
+      (function(p, d) { setTimeout(function() { p.remove(); }, d); })(piece, duration);
+    }
+  }
+
+  function showAllDone() {
+    showScreen(allDone);
+    fireConfetti(60);
+    setTimeout(function() { fireConfetti(60); }, 500);
+    setTimeout(function() { fireConfetti(60); }, 1000);
+    playMasterySound();
+  }
+
+  speakBtn.addEventListener('click', function() {
+    if (state.current) speak(state.current.en);
+  });
+  nextBtn.addEventListener('click', newQuestion);
+  document.getElementById('restartHome').addEventListener('click', goHome);
+
+  // ===== Boot =====
+  function bootGame() {
+    try {
+      goHome();
+    } catch (err) {
+      document.body.innerHTML = '<div style="padding:20px;text-align:center;font-family:sans-serif;"><h2>Error</h2><p>Please open in Safari or Chrome.</p><pre>' + err.message + '</pre></div>';
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootGame);
+  } else {
+    bootGame();
+  }
+</script>
+</body>
+</html>
