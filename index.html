@@ -1463,12 +1463,8 @@ const LANGUAGES = {
 
   // ===== Photo OCR =====
   function resetPhotoScreen() {
-    document.getElementById('photoPreview').innerHTML = '';
-    document.getElementById('photoStatus').className = 'photo-status';
-    document.getElementById('photoStatus').textContent = 'Ready when you are 👆';
+    rebuildPhotoScreen();
   }
-  document.getElementById('photoCamera').addEventListener('change', handlePhotoFile);
-  document.getElementById('photoUpload').addEventListener('change', handlePhotoFile);
 
   function handlePhotoFile(e) {
     var file = e.target.files[0];
@@ -1513,14 +1509,16 @@ const LANGUAGES = {
       }
     }).then(function(result) {
       var text = result.data.text;
+      console.log('OCR raw text:', text);
       var words = extractEnglishWords(text);
+      console.log('Extracted candidates:', words);
       if (words.length === 0) {
         status.className = 'photo-status error';
         status.textContent = '❌ No words found. Try a clearer photo of printed text.';
         return;
       }
       status.className = 'photo-status success';
-      status.textContent = '✅ Found ' + words.length + ' words. Translating to ' + LANGUAGES[currentLang].name + '...';
+      status.textContent = '✅ Found ' + words.length + ' candidate words. Matching...';
       translateExtractedWords(words);
     }).catch(function(err) {
       status.className = 'photo-status error';
@@ -1529,71 +1527,252 @@ const LANGUAGES = {
   }
 
   function extractEnglishWords(text) {
-    // Extract English words from OCR text
-    var lines = text.split(/[\n,;]+/);
-    var words = [];
+    // Build a master list of multi-word phrases from the dictionary
+    var phrases = {};
+    for (var L = 1; L <= 5; L++) {
+      for (var en in DICTIONARY[L]) {
+        // Strip parenthetical notes like "(noun)"
+        var clean = en.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
+        phrases[clean] = en;
+      }
+    }
+
+    var candidates = [];
     var seen = {};
+
+    function addCandidate(w) {
+      w = w.toLowerCase().trim();
+      if (w.length < 2) return;
+      if (seen[w]) return;
+      seen[w] = true;
+      candidates.push(w);
+    }
+
+    // Split into lines, then process each line
+    var lines = text.split(/[\n\r]+/);
     for (var i = 0; i < lines.length; i++) {
-      var line = lines[i].trim();
+      var line = lines[i];
+      // Replace common OCR artifacts:
+      //   "v" or "V" at start of word often = checkmark misread → remove
+      //   numbers, dots, dashes between letters
+      line = line.replace(/[√✓]/g, ' '); // explicit checkmarks
+      line = line.replace(/[^\w\s'-]/g, ' '); // keep letters, digits, spaces, apostrophe, hyphen
+      line = line.replace(/\s+/g, ' ').trim();
       if (!line) continue;
-      // Get English-letter sequences (1-3 words per entry)
-      var matches = line.match(/[a-zA-Z][a-zA-Z' -]{1,30}[a-zA-Z]/g);
-      if (matches) {
-        for (var j = 0; j < matches.length; j++) {
-          var w = matches[j].toLowerCase().trim();
-          if (w.length < 2) continue;
-          if (seen[w]) continue;
-          seen[w] = true;
-          words.push(w);
+
+      // First try to match multi-word phrases (2-3 words) against dictionary
+      var tokens = line.split(/\s+/);
+      var idx = 0;
+      while (idx < tokens.length) {
+        var matched = false;
+        // Try 3-word, 2-word, 1-word combos
+        for (var span = Math.min(3, tokens.length - idx); span >= 1; span--) {
+          var combo = tokens.slice(idx, idx + span).join(' ').toLowerCase();
+          combo = combo.replace(/[0-9]/g, '').replace(/^[^a-z]+|[^a-z]+$/g, '').trim();
+          if (combo.length < 2) continue;
+          // Skip if first token is just "v" (likely OCR artifact for checkmark)
+          if (span === 1 && (combo === 'v' || combo === 'vv')) continue;
+          if (phrases[combo]) {
+            addCandidate(combo);
+            idx += span;
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          // Add the token as-is for fuzzy matching later
+          var t = tokens[idx].toLowerCase().replace(/[0-9]/g, '').replace(/^[^a-z]+|[^a-z]+$/g, '').trim();
+          // Drop "v" prefix (mis-OCR'd checkmark)
+          if (t.length > 1 && t[0] === 'v' && phrases[t.substring(1)]) {
+            t = t.substring(1);
+          }
+          if (t.length >= 2) addCandidate(t);
+          idx++;
         }
       }
     }
-    return words;
+    return candidates;
+  }
+
+  // ===== Fuzzy matching for OCR errors =====
+  function levenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    var matrix = [];
+    for (var i = 0; i <= b.length; i++) matrix[i] = [i];
+    for (var j = 0; j <= a.length; j++) matrix[0][j] = j;
+    for (i = 1; i <= b.length; i++) {
+      for (j = 1; j <= a.length; j++) {
+        if (b.charAt(i - 1) === a.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    return matrix[b.length][a.length];
+  }
+
+  function findInDictionary(en) {
+    // Exact match first
+    for (var L = 1; L <= 5; L++) {
+      if (DICTIONARY[L][en] && DICTIONARY[L][en][currentLang]) {
+        return { en: en, tr: DICTIONARY[L][en][currentLang], exact: true };
+      }
+    }
+    // Try with parenthetical variants stripped
+    for (L = 1; L <= 5; L++) {
+      for (var key in DICTIONARY[L]) {
+        var clean = key.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
+        if (clean === en && DICTIONARY[L][key][currentLang]) {
+          return { en: clean, tr: DICTIONARY[L][key][currentLang], exact: true };
+        }
+      }
+    }
+    // Fuzzy match — allow 1 character difference for short words, 2 for longer
+    var bestMatch = null;
+    var bestDist = 999;
+    var threshold = en.length <= 4 ? 1 : (en.length <= 7 ? 1 : 2);
+    for (L = 1; L <= 5; L++) {
+      for (var key2 in DICTIONARY[L]) {
+        var clean2 = key2.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
+        if (Math.abs(clean2.length - en.length) > threshold) continue;
+        var d = levenshtein(en, clean2);
+        if (d <= threshold && d < bestDist) {
+          bestDist = d;
+          bestMatch = { en: clean2, tr: DICTIONARY[L][key2][currentLang], exact: false, original: en };
+        }
+      }
+    }
+    return bestMatch;
   }
 
   function translateExtractedWords(englishWords) {
     var status = document.getElementById('photoStatus');
-    // Look up each word in the master dictionary across all levels
     var found = [];
     var notFound = [];
+    var foundKeys = {};
     for (var i = 0; i < englishWords.length; i++) {
       var en = englishWords[i];
-      var tr = null;
-      for (var L = 1; L <= 5; L++) {
-        if (DICTIONARY[L][en] && DICTIONARY[L][en][currentLang]) {
-          tr = DICTIONARY[L][en][currentLang];
-          break;
-        }
+      var match = findInDictionary(en);
+      if (match && !foundKeys[match.en]) {
+        foundKeys[match.en] = true;
+        found.push({ en: match.en, tr: match.tr, fuzzy: !match.exact, originalOcr: match.original });
+      } else if (!match) {
+        notFound.push(en);
       }
-      if (tr) found.push({ en: en, tr: tr });
-      else notFound.push(en);
     }
 
-    if (found.length < 3) {
+    if (found.length === 0) {
       status.className = 'photo-status error';
-      status.textContent = '❌ Only found translations for ' + found.length + ' words. Try a different image or use "My Words" mode to add them manually.';
+      status.innerHTML = '❌ No matching words found in dictionary.<br>' +
+        '<small>OCR detected: ' + englishWords.slice(0, 10).join(', ') +
+        (englishWords.length > 10 ? '…' : '') + '</small><br>' +
+        '<small>Try a clearer image, or use <b>My Words</b> to add them manually.</small>';
       return;
     }
 
-    status.className = 'photo-status success';
-    var msg = '✅ Got ' + found.length + ' translations';
-    if (notFound.length > 0) msg += ' (' + notFound.length + ' unknown skipped)';
-    status.textContent = msg + '. Starting game...';
+    // Show review screen
+    showOcrReview(found, notFound);
+  }
 
-    // Save these as the session, also save to customWords so user can re-use
-    sessionWords = found;
-    loadStats();
-    recentWords = [];
-    state.score = 0;
-    state.streak = 0;
-    buildInitialQueue();
+  function showOcrReview(found, notFound) {
+    // Replace the photo screen content with a review UI
+    var photoScreen = document.getElementById('photoScreen');
+    var reviewHtml = '<div style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;">' +
+      '<div style="font-family:\'Bagel Fat One\',sans-serif;font-size:18px;text-align:center;">Review Words</div>' +
+      '<div style="font-size:12px;color:#6b7280;text-align:center;font-weight:500;">' +
+        'Found <b>' + found.length + '</b> words. Tap × to remove any wrong ones. Then play!' +
+      '</div>' +
+      '<div id="reviewList" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border:2px dashed #d1d5db;border-radius:10px;padding:8px;background:#fafafa;"></div>' +
+      (notFound.length > 0 ?
+        '<div style="font-size:11px;color:#9ca3af;background:#fef3c7;border-radius:8px;padding:6px;border:1px dashed #d97706;">' +
+        '⚠️ Skipped (no translation): <i>' + notFound.slice(0, 8).join(', ') + (notFound.length > 8 ? '…' : '') + '</i>' +
+        '</div>' : ''
+      ) +
+      '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+        '<button id="reviewCancel" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:white;">← Back</button>' +
+        '<button id="reviewPlay" style="flex:1;padding:10px;border:2px solid #1f2937;border-radius:10px;cursor:pointer;box-shadow:2px 2px 0 #1f2937;font-family:Fredoka,sans-serif;font-weight:700;font-size:14px;background:#22c55e;color:white;">▶ Play (' + found.length + ')</button>' +
+      '</div>' +
+    '</div>';
+    photoScreen.innerHTML = reviewHtml;
 
-    setTimeout(function() {
+    var reviewWords = found.slice();
+    var isRTL = LANGUAGES[currentLang].dir === 'rtl';
+
+    function renderReview() {
+      var listEl = document.getElementById('reviewList');
+      var playBtn = document.getElementById('reviewPlay');
+      playBtn.textContent = '▶ Play (' + reviewWords.length + ')';
+      playBtn.disabled = reviewWords.length < 5;
+      if (reviewWords.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:13px;padding:20px;font-style:italic;">No words left.</div>';
+        return;
+      }
+      listEl.innerHTML = '';
+      for (var i = 0; i < reviewWords.length; i++) {
+        (function(idx, word) {
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:white;border-radius:8px;border:1px solid #e5e7eb;';
+          var fuzzyTag = word.fuzzy ? '<span style="font-size:9px;color:#d97706;background:#fef3c7;padding:1px 4px;border-radius:4px;margin-left:4px;">corrected</span>' : '';
+          var trStyle = isRTL ? 'flex:1;text-align:right;font-family:Heebo,sans-serif;font-weight:600;font-size:14px;direction:rtl;' : 'flex:1;text-align:left;font-family:Fredoka,sans-serif;font-weight:600;font-size:14px;';
+          row.innerHTML =
+            '<span style="flex:1;font-weight:600;font-size:13px;">' + word.en + fuzzyTag + '</span>' +
+            '<span style="' + trStyle + '">' + word.tr + '</span>' +
+            '<button data-i="' + idx + '" style="background:#fecaca;border:1px solid #ef4444;color:#ef4444;width:24px;height:24px;border-radius:50%;cursor:pointer;font-weight:700;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>';
+          row.querySelector('button').addEventListener('click', function() {
+            reviewWords.splice(idx, 1);
+            renderReview();
+          });
+          listEl.appendChild(row);
+        })(i, reviewWords[i]);
+      }
+    }
+
+    renderReview();
+
+    document.getElementById('reviewCancel').addEventListener('click', function() {
+      rebuildPhotoScreen();
+    });
+    document.getElementById('reviewPlay').addEventListener('click', function() {
+      if (reviewWords.length < 5) { alert('Need at least 5 words to play'); return; }
+      sessionWords = reviewWords.map(function(w) { return { en: w.en, tr: w.tr }; });
+      loadStats();
+      recentWords = [];
+      state.score = 0;
+      state.streak = 0;
+      buildInitialQueue();
       showScreen(gameScreen);
       updateStats();
       updateProgress();
       newQuestion();
-    }, 1200);
+    });
+  }
+
+  function rebuildPhotoScreen() {
+    var photoScreen = document.getElementById('photoScreen');
+    photoScreen.innerHTML =
+      '<div class="photo-info">' +
+        '📷 Take a photo or upload one of a vocabulary list. <b>Works best with clear printed text.</b> Handwriting may not work well. You\'ll be able to review and edit the words after.' +
+      '</div>' +
+      '<div class="photo-controls">' +
+        '<label for="photoCamera">📸 Take Photo' +
+          '<input type="file" id="photoCamera" accept="image/*" capture="environment">' +
+        '</label>' +
+        '<label for="photoUpload">📁 Choose File' +
+          '<input type="file" id="photoUpload" accept="image/*">' +
+        '</label>' +
+      '</div>' +
+      '<div class="photo-preview" id="photoPreview"></div>' +
+      '<div class="photo-status" id="photoStatus">Ready when you are 👆</div>';
+    // Re-bind handlers
+    document.getElementById('photoCamera').addEventListener('change', handlePhotoFile);
+    document.getElementById('photoUpload').addEventListener('change', handlePhotoFile);
   }
 
   // ===== Game logic =====
