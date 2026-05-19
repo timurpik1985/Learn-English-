@@ -415,8 +415,8 @@
           <button class="mode-btn photo" id="modePhoto">
             <span class="emoji">📷</span>
             <div>
-              <div class="title">Photo Words</div>
-              <div class="desc">Snap a vocabulary list (printed works best)</div>
+              <div class="title">Scan Printed Text</div>
+              <div class="desc">Photo or screenshot of clearly printed words</div>
             </div>
           </button>
           <button class="mode-btn custom" id="modeCustom">
@@ -446,7 +446,8 @@
       <!-- PHOTO SCREEN -->
       <div class="photo-screen hide" id="photoScreen">
         <div class="photo-info">
-          📷 Take a photo or upload one of a vocabulary list. <b>Works best with clear printed text.</b> Handwriting may not work well. You'll be able to review and edit the words after.
+          📷 Scan a photo or screenshot of <b>clearly printed text</b> — textbook page, typed vocabulary list, or printed flashcard.<br>
+          <small>⚠️ Handwriting and blurry photos won't work well. After scanning, you can tap any box on the image to fix or remove words.</small>
         </div>
         <div class="photo-controls">
           <label for="photoCamera">📸 Take Photo
@@ -1502,43 +1503,50 @@ const LANGUAGES = {
     var img = new Image();
     img.onload = function() {
       var canvas = document.createElement('canvas');
-      var maxDim = 2000, minDim = 1200;
+      // For printed text, ~1800px on the long side is the sweet spot for Tesseract
+      var targetDim = 1800;
       var w = img.width, h = img.height, scale = 1;
-      if (Math.max(w, h) > maxDim) scale = maxDim / Math.max(w, h);
-      else if (Math.max(w, h) < minDim) scale = minDim / Math.max(w, h);
+      if (Math.max(w, h) > targetDim) scale = targetDim / Math.max(w, h);
+      else if (Math.max(w, h) < 1000) scale = 1000 / Math.max(w, h);
       canvas.width = Math.round(w * scale);
       canvas.height = Math.round(h * scale);
       var ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
       var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       var d = imgData.data;
-      var gray = new Uint8Array(canvas.width * canvas.height);
-      var hist = new Array(256); for (var i = 0; i < 256; i++) hist[i] = 0;
+      var N = canvas.width * canvas.height;
+
+      // Pass 1: grayscale + histogram
+      var gray = new Uint8Array(N);
+      var hist = new Uint32Array(256);
       for (var p = 0, gi = 0; p < d.length; p += 4, gi++) {
         var v = (d[p] * 0.299 + d[p + 1] * 0.587 + d[p + 2] * 0.114) | 0;
         gray[gi] = v;
         hist[v]++;
       }
-      var total = canvas.width * canvas.height;
-      var sum = 0;
-      for (i = 0; i < 256; i++) sum += i * hist[i];
-      var sumB = 0, wB = 0, wF = 0, maxVar = 0, threshold = 128;
-      for (i = 0; i < 256; i++) {
-        wB += hist[i]; if (wB === 0) continue;
-        wF = total - wB; if (wF === 0) break;
-        sumB += i * hist[i];
-        var mB = sumB / wB, mF = (sum - sumB) / wF;
-        var between = wB * wF * (mB - mF) * (mB - mF);
-        if (between > maxVar) { maxVar = between; threshold = i; }
-      }
-      var softMargin = 25;
+
+      // Pass 2: histogram stretch (1st and 99th percentile → 0 and 255)
+      var lowCount = N * 0.01, highCount = N * 0.01;
+      var cum = 0, lowVal = 0, highVal = 255;
+      for (var k = 0; k < 256; k++) { cum += hist[k]; if (cum >= lowCount) { lowVal = k; break; } }
+      cum = 0;
+      for (var k2 = 255; k2 >= 0; k2--) { cum += hist[k2]; if (cum >= highCount) { highVal = k2; break; } }
+      // If image is already low contrast, don't stretch (would blow it out)
+      if (highVal - lowVal < 50) { lowVal = 0; highVal = 255; }
+      var range = Math.max(1, highVal - lowVal);
+
+      // Pass 3: linear stretch + gentle S-curve to make text darker, background lighter
       for (p = 0, gi = 0; p < d.length; p += 4, gi++) {
         var g = gray[gi];
-        var out;
-        if (g < threshold - softMargin) out = 0;
-        else if (g > threshold + softMargin) out = 255;
-        else out = ((g - (threshold - softMargin)) / (2 * softMargin)) * 255 | 0;
+        var stretched = ((g - lowVal) / range) * 255;
+        stretched = Math.max(0, Math.min(255, stretched));
+        var x = stretched / 255;
+        // Sigmoid S-curve, k=8 gives moderate contrast boost
+        var curve = 1 / (1 + Math.exp(-8 * (x - 0.5)));
+        var out = (curve * 255) | 0;
         d[p] = d[p + 1] = d[p + 2] = out;
         d[p + 3] = 255;
       }
@@ -1696,7 +1704,7 @@ const LANGUAGES = {
           '<div style="font-family:\'Bagel Fat One\',sans-serif;font-size:16px;">Review &amp; Edit</div>' +
           '<div style="font-size:11px;color:#6b7280;">Tap boxes to edit</div>' +
         '</div>' +
-        '<div id="imgWrap" style="position:relative;flex-shrink:0;width:100%;max-height:35vh;overflow:hidden;border:2px solid #1f2937;border-radius:10px;background:#000;">' +
+        '<div id="imgWrap" style="position:relative;flex-shrink:0;width:100%;max-height:35vh;overflow:hidden;border:2px solid #1f2937;border-radius:10px;background:#f3f4f6;">' +
           '<img id="reviewImg" src="' + ocrState.originalImage + '" style="display:block;width:100%;height:auto;max-height:35vh;object-fit:contain;">' +
           '<div id="boxOverlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"></div>' +
         '</div>' +
@@ -1757,9 +1765,37 @@ const LANGUAGES = {
         img.onload = renderBoxes;
         return;
       }
-      var imgW = img.clientWidth, imgH = img.clientHeight;
+      var containerW = img.clientWidth, containerH = img.clientHeight;
+      var natW = img.naturalWidth, natH = img.naturalHeight;
       var ocrW = ocrState.imgWidth, ocrH = ocrState.imgHeight;
-      if (!ocrW || !ocrH) return;
+      if (!ocrW || !ocrH || !natW || !natH) return;
+
+      // Compute actual displayed image area inside the letterboxed container.
+      // object-fit: contain scales the image uniformly to fit within the container,
+      // leaving "letterbox" bars on either the sides or top/bottom.
+      var containerRatio = containerW / containerH;
+      var imgRatio = natW / natH;
+      var displayW, displayH, offsetX, offsetY;
+      if (imgRatio > containerRatio) {
+        // Image is wider — letterbox on top/bottom
+        displayW = containerW;
+        displayH = containerW / imgRatio;
+        offsetX = 0;
+        offsetY = (containerH - displayH) / 2;
+      } else {
+        // Image is taller — letterbox on left/right
+        displayH = containerH;
+        displayW = containerH * imgRatio;
+        offsetX = (containerW - displayW) / 2;
+        offsetY = 0;
+      }
+
+      // OCR coordinates are in the *processed* image space (ocrW x ocrH).
+      // The processed image was generated from the original at a scale,
+      // but kept the same aspect ratio. So we can map from OCR coords
+      // directly to the displayed area by ratio.
+      var scaleX = displayW / ocrW;
+      var scaleY = displayH / ocrH;
 
       // Build set of bboxes already in finalWords for color
       var inListByCoord = {};
@@ -1773,16 +1809,16 @@ const LANGUAGES = {
         var rw = ocrState.rawWords[j];
         var bb = rw.bbox;
         if (!bb) continue;
-        var x = (bb.x0 / ocrW) * imgW;
-        var y = (bb.y0 / ocrH) * imgH;
-        var bw = ((bb.x1 - bb.x0) / ocrW) * imgW;
-        var bh = ((bb.y1 - bb.y0) / ocrH) * imgH;
+        var x = offsetX + bb.x0 * scaleX;
+        var y = offsetY + bb.y0 * scaleY;
+        var bw = (bb.x1 - bb.x0) * scaleX;
+        var bh = (bb.y1 - bb.y0) * scaleY;
         // Color: green if in finalWords, gray if unmatched
         var inList = inListByCoord[bb.x0 + ',' + bb.y0];
         var color = inList ? '#22c55e' : '#9ca3af';
-        var bg = inList ? 'rgba(34,197,94,0.2)' : 'rgba(156,163,175,0.15)';
+        var bg = inList ? 'rgba(34,197,94,0.25)' : 'rgba(156,163,175,0.18)';
         var box = document.createElement('div');
-        box.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + bw + 'px;height:' + bh + 'px;border:2px solid ' + color + ';background:' + bg + ';border-radius:3px;pointer-events:auto;cursor:pointer;';
+        box.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + bw + 'px;height:' + bh + 'px;border:2px solid ' + color + ';background:' + bg + ';border-radius:3px;pointer-events:auto;cursor:pointer;box-sizing:border-box;';
         (function(rawWord) {
           box.addEventListener('click', function(e) {
             e.stopPropagation();
@@ -1919,8 +1955,8 @@ const LANGUAGES = {
     var photoScreen = document.getElementById('photoScreen');
     photoScreen.innerHTML =
       '<div class="photo-info">' +
-        '📷 Take a photo or upload a vocabulary list. <b>Works best with clear printed text.</b><br>' +
-        '<small>After scanning, you can tap word boxes on the image to edit, or add words manually.</small>' +
+        '📷 Scan a photo or screenshot of <b>clearly printed text</b> — textbook page, typed vocabulary list, or printed flashcard.<br>' +
+        '<small>⚠️ Handwriting and blurry photos won\'t work well. After scanning, you can tap any box on the image to fix or remove words.</small>' +
       '</div>' +
       '<div class="photo-controls">' +
         '<label for="photoCamera">📸 Take Photo' +
